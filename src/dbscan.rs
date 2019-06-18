@@ -1,5 +1,5 @@
 use ndarray::{Array2, ArrayView2};
-use petal_neighbors::BallTree;
+use petal_neighbors::{BallTree, Neighbor};
 use std::collections::{HashMap, HashSet};
 
 use super::Fit;
@@ -66,11 +66,13 @@ impl DBSCAN {
         db: &BallTree,
         input: &ArrayView2<f64>,
         cid: usize,
-        candidates: &[usize],
+        neighbors: &[Neighbor],
         visited: &mut [bool],
         clusters: &mut HashMap<usize, Vec<usize>>,
     ) {
-        for &idx in candidates {
+        for neighbor in neighbors {
+            let idx = neighbor.idx;
+
             if visited[idx] {
                 continue;
             }
