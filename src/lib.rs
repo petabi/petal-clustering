@@ -2,7 +2,7 @@ mod dbscan;
 
 pub use dbscan::DBSCAN;
 
-pub trait Fit {
+pub trait Fit<'a> {
     type Input;
     type Output;
 

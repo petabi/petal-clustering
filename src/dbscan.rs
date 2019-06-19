@@ -1,4 +1,4 @@
-use ndarray::{Array2, ArrayView2};
+use ndarray::ArrayView2;
 use petal_neighbors::{BallTree, Neighbor};
 use std::collections::{HashMap, HashSet};
 
@@ -27,17 +27,16 @@ impl DBSCAN {
     }
 }
 
-impl Fit for DBSCAN {
-    type Input = Array2<f64>;
+impl<'a> Fit<'a> for DBSCAN {
+    type Input = &'a ArrayView2<'a, f64>;
     type Output = (HashMap<usize, Vec<usize>>, Vec<usize>);
 
     fn fit(&mut self, input: Self::Input) -> Self::Output {
-        let points = &input.view();
-        let db = BallTree::new(points);
+        let db = BallTree::new(input);
         let mut visited = vec![false; input.rows()];
         let mut clusters = HashMap::new();
 
-        for (idx, point) in (0..points.rows()).zip(points.genrows()) {
+        for (idx, point) in (0..input.rows()).zip(input.genrows()) {
             if visited[idx] {
                 continue;
             }
@@ -48,7 +47,7 @@ impl Fit for DBSCAN {
             }
             let cid = clusters.len();
             clusters.entry(cid).or_insert_with(|| vec![idx]);
-            self.expand_cluster(&db, points, cid, &neighbors, &mut visited, &mut clusters);
+            self.expand_cluster(&db, input, cid, &neighbors, &mut visited, &mut clusters);
         }
 
         let in_cluster: HashSet<usize> = clusters.values().flatten().cloned().collect();
@@ -94,7 +93,7 @@ impl DBSCAN {
 #[cfg(test)]
 mod test {
     use super::*;
-    use ndarray::arr2;
+    use ndarray::aview2;
 
     fn comparison(
         data: Vec<f64>,
@@ -138,10 +137,10 @@ mod test {
             [-2.0, 3.0],
             [-2.2, 3.1],
         ];
-        let input = arr2(&data);
+        let input = aview2(&data);
 
         let mut model = DBSCAN::new(0.5, 2);
-        let (mut clusters, mut outliers) = model.fit(input);
+        let (mut clusters, mut outliers) = model.fit(&input);
         outliers.sort_unstable();
         for (_, v) in clusters.iter_mut() {
             v.sort_unstable();
