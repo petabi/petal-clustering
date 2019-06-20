@@ -9,7 +9,7 @@ pub trait Fit<'a> {
     fn fit(&mut self, input: Self::Input) -> Self::Output;
 }
 
-pub trait Predict {
+pub trait Predict<'a> {
     type Input;
     type Output;
 
