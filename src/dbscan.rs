@@ -28,7 +28,7 @@ impl DBSCAN {
 }
 
 impl<'a> Fit<'a> for DBSCAN {
-    type Input = &'a ArrayView2<'a, f64>;
+    type Input = ArrayView2<'a, f64>;
     type Output = (HashMap<usize, Vec<usize>>, Vec<usize>);
 
     fn fit(&mut self, input: Self::Input) -> Self::Output {
@@ -47,7 +47,7 @@ impl<'a> Fit<'a> for DBSCAN {
             }
             let cid = clusters.len();
             clusters.entry(cid).or_insert_with(|| vec![idx]);
-            self.expand_cluster(&db, input, cid, &neighbors, &mut visited, &mut clusters);
+            self.expand_cluster(&db, &input, cid, &neighbors, &mut visited, &mut clusters);
         }
 
         let in_cluster: HashSet<usize> = clusters.values().flatten().cloned().collect();
@@ -140,7 +140,7 @@ mod test {
         let input = aview2(&data);
 
         let mut model = DBSCAN::new(0.5, 2);
-        let (mut clusters, mut outliers) = model.fit(&input);
+        let (mut clusters, mut outliers) = model.fit(input);
         outliers.sort_unstable();
         for (_, v) in clusters.iter_mut() {
             v.sort_unstable();
