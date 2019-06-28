@@ -1,6 +1,6 @@
 mod dbscan;
 
-pub use dbscan::DBSCAN;
+pub use dbscan::Dbscan;
 
 pub trait Fit<'a> {
     type Input;
