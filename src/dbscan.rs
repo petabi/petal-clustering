@@ -32,6 +32,11 @@ impl<'a> Fit<'a> for DBSCAN {
     type Output = (HashMap<usize, Vec<usize>>, Vec<usize>);
 
     fn fit(&mut self, input: Self::Input) -> Self::Output {
+        // BallTree does not accept an empty input.
+        if input.is_empty() {
+            return (HashMap::new(), Vec::new());
+        }
+
         let db = BallTree::new(input);
         let mut visited = vec![false; input.rows()];
         let mut clusters = HashMap::new();
@@ -149,5 +154,16 @@ mod test {
 
         assert_eq!(answer.0, clusters);
         assert_eq!(answer.1, outliers);
+    }
+
+    #[test]
+    fn fit_empty() {
+        let data: Vec<[f64; 8]> = vec![];
+        let input = aview2(&data);
+
+        let mut model = DBSCAN::new(0.5, 2);
+        let (clusters, outliers) = model.fit(input);
+        assert!(clusters.is_empty());
+        assert!(outliers.is_empty());
     }
 }
