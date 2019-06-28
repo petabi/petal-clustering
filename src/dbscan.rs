@@ -4,30 +4,30 @@ use std::collections::{HashMap, HashSet};
 
 use super::Fit;
 
-pub struct DBSCAN {
+pub struct Dbscan {
     pub eps: f64,
     pub min_cluster_size: usize,
 }
 
-impl Default for DBSCAN {
-    fn default() -> DBSCAN {
-        DBSCAN {
+impl Default for Dbscan {
+    fn default() -> Dbscan {
+        Dbscan {
             eps: 0.5,
             min_cluster_size: 5,
         }
     }
 }
 
-impl DBSCAN {
+impl Dbscan {
     pub fn new(eps: f64, min_cluster_size: usize) -> Self {
-        DBSCAN {
+        Dbscan {
             eps,
             min_cluster_size,
         }
     }
 }
 
-impl<'a> Fit<'a> for DBSCAN {
+impl<'a> Fit<'a> for Dbscan {
     type Input = ArrayView2<'a, f64>;
     type Output = (HashMap<usize, Vec<usize>>, Vec<usize>);
 
@@ -64,7 +64,7 @@ impl<'a> Fit<'a> for DBSCAN {
     }
 }
 
-impl DBSCAN {
+impl Dbscan {
     fn expand_cluster(
         &mut self,
         db: &BallTree,
@@ -144,7 +144,7 @@ mod test {
         ];
         let input = aview2(&data);
 
-        let mut model = DBSCAN::new(0.5, 2);
+        let mut model = Dbscan::new(0.5, 2);
         let (mut clusters, mut outliers) = model.fit(input);
         outliers.sort_unstable();
         for (_, v) in clusters.iter_mut() {
@@ -161,7 +161,7 @@ mod test {
         let data: Vec<[f64; 8]> = vec![];
         let input = aview2(&data);
 
-        let mut model = DBSCAN::new(0.5, 2);
+        let mut model = Dbscan::new(0.5, 2);
         let (clusters, outliers) = model.fit(input);
         assert!(clusters.is_empty());
         assert!(outliers.is_empty());
