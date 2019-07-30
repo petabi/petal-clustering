@@ -1,5 +1,5 @@
 use ndarray::ArrayView2;
-use petal_neighbors::{BallTree, Neighbor};
+use petal_neighbors::BallTree;
 use std::collections::{HashMap, HashSet};
 
 use super::Fit;
@@ -38,21 +38,36 @@ impl<'a> Fit<'a> for Dbscan {
         }
 
         let db = BallTree::new(input);
+        let neighborhoods: Vec<_> = input
+            .genrows()
+            .into_iter()
+            .map(|p| {
+                db.query_radius(&p, self.eps)
+                    .into_iter()
+                    .map(|n| n.idx)
+                    .collect::<Vec<_>>()
+            })
+            .collect();
         let mut visited = vec![false; input.rows()];
         let mut clusters = HashMap::new();
 
-        for (idx, point) in (0..input.rows()).zip(input.genrows()) {
-            if visited[idx] {
+        for (idx, neighbors) in neighborhoods.iter().enumerate() {
+            if visited[idx] || neighbors.len() < self.min_cluster_size {
                 continue;
             }
             visited[idx] = true;
-            let neighbors = db.query_radius(&point, self.eps);
-            if neighbors.len() < self.min_cluster_size {
-                continue;
-            }
+
             let cid = clusters.len();
             clusters.entry(cid).or_insert_with(|| vec![idx]);
-            self.expand_cluster(&db, &input, cid, &neighbors, &mut visited, &mut clusters);
+            self.expand_cluster(
+                &db,
+                &input,
+                idx,
+                cid,
+                &neighborhoods,
+                &mut visited,
+                &mut clusters,
+            );
         }
 
         let in_cluster: HashSet<usize> = clusters.values().flatten().cloned().collect();
@@ -69,28 +84,26 @@ impl Dbscan {
         &mut self,
         db: &BallTree,
         input: &ArrayView2<f64>,
+        core_idx: usize,
         cid: usize,
-        neighbors: &[Neighbor],
+        neighborhoods: &[Vec<usize>],
         visited: &mut [bool],
         clusters: &mut HashMap<usize, Vec<usize>>,
     ) {
-        for neighbor in neighbors {
-            let idx = neighbor.idx;
-
-            if visited[idx] {
+        for &neighbor in &neighborhoods[core_idx] {
+            if visited[neighbor] {
                 continue;
             }
-            visited[idx] = true;
-            let point = input.row(idx);
-            let neighbors = db.query_radius(&point, self.eps);
+            visited[neighbor] = true;
+            let neighbors = &neighborhoods[neighbor];
             if neighbors.len() < self.min_cluster_size {
                 continue;
             }
             {
                 let cluster = clusters.entry(cid).or_insert_with(|| vec![]);
-                cluster.push(idx);
+                cluster.push(neighbor);
             }
-            self.expand_cluster(db, input, cid, &neighbors, visited, clusters);
+            self.expand_cluster(db, input, neighbor, cid, &neighborhoods, visited, clusters);
         }
     }
 }
