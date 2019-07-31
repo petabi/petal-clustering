@@ -44,7 +44,6 @@ impl<'a> Fit<'a> for Dbscan {
             .map(|p| {
                 db.query_radius(&p, self.eps)
                     .into_iter()
-                    .map(|n| n.idx)
                     .collect::<Vec<_>>()
             })
             .collect();
@@ -167,6 +166,15 @@ mod test {
 
         assert_eq!(answer.0, clusters);
         assert_eq!(answer.1, outliers);
+    }
+
+    #[test]
+    fn dbscan_core_samples() {
+        let data = vec![[0.], [2.], [3.], [4.], [6.], [8.], [10.]];
+        let mut model = Dbscan::new(1.01, 1);
+        let (clusters, outliers) = model.fit(aview2(&data));
+        assert_eq!(clusters.len(), 5); // {0: [0], 1: [1, 2, 3], 2: [4], 3: [5], 4: [6]}
+        assert!(outliers.is_empty());
     }
 
     #[test]
