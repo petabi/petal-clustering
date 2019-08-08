@@ -92,15 +92,14 @@ impl Dbscan {
         for &neighbor in &neighborhoods[core_idx] {
             if visited[neighbor] {
                 continue;
+            } else {
+                let cluster = clusters.entry(cid).or_insert_with(|| vec![]);
+                cluster.push(neighbor);
+                visited[neighbor] = true;
             }
-            visited[neighbor] = true;
             let neighbors = &neighborhoods[neighbor];
             if neighbors.len() < self.min_cluster_size {
                 continue;
-            }
-            {
-                let cluster = clusters.entry(cid).or_insert_with(|| vec![]);
-                cluster.push(neighbor);
             }
             self.expand_cluster(db, input, neighbor, cid, &neighborhoods, visited, clusters);
         }
