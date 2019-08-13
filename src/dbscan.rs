@@ -58,15 +58,7 @@ impl<'a> Fit<'a> for Dbscan {
 
             let cid = clusters.len();
             clusters.entry(cid).or_insert_with(|| vec![idx]);
-            self.expand_cluster(
-                &db,
-                &input,
-                idx,
-                cid,
-                &neighborhoods,
-                &mut visited,
-                &mut clusters,
-            );
+            self.expand_cluster(idx, cid, &neighborhoods, &mut visited, &mut clusters);
         }
 
         let in_cluster: HashSet<usize> = clusters.values().flatten().cloned().collect();
@@ -81,27 +73,29 @@ impl<'a> Fit<'a> for Dbscan {
 impl Dbscan {
     fn expand_cluster(
         &mut self,
-        db: &BallTree,
-        input: &ArrayView2<f64>,
         core_idx: usize,
         cid: usize,
         neighborhoods: &[Vec<usize>],
         visited: &mut [bool],
         clusters: &mut HashMap<usize, Vec<usize>>,
     ) {
-        for &neighbor in &neighborhoods[core_idx] {
-            if visited[neighbor] {
-                continue;
-            } else {
-                let cluster = clusters.entry(cid).or_insert_with(|| vec![]);
-                cluster.push(neighbor);
+        let mut cores_to_visit = vec![core_idx];
+        while let Some(cur_core) = cores_to_visit.pop() {
+            for &neighbor in &neighborhoods[cur_core] {
+                if visited[neighbor] {
+                    continue;
+                }
+                clusters
+                    .get_mut(&cid)
+                    .expect("cluster should exist")
+                    .push(neighbor);
                 visited[neighbor] = true;
+                let neighbors = &neighborhoods[neighbor];
+                if neighbors.len() < self.min_cluster_size {
+                    continue;
+                }
+                cores_to_visit.push(neighbor);
             }
-            let neighbors = &neighborhoods[neighbor];
-            if neighbors.len() < self.min_cluster_size {
-                continue;
-            }
-            self.expand_cluster(db, input, neighbor, cid, &neighborhoods, visited, clusters);
         }
     }
 }
