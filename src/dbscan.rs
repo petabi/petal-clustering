@@ -34,16 +34,7 @@ impl<'a> Fit<'a> for Dbscan {
             return (HashMap::new(), Vec::new());
         }
 
-        let db = BallTree::new(input);
-        let neighborhoods: Vec<_> = input
-            .genrows()
-            .into_iter()
-            .map(|p| {
-                db.query_radius(&p, self.eps)
-                    .into_iter()
-                    .collect::<Vec<usize>>()
-            })
-            .collect();
+        let neighborhoods = build_neighborhoods(&input, self.eps);
         let mut visited = vec![false; input.rows()];
         let mut clusters = HashMap::new();
         for (idx, neighbors) in neighborhoods.iter().enumerate() {
@@ -63,6 +54,15 @@ impl<'a> Fit<'a> for Dbscan {
 
         (clusters, outliers)
     }
+}
+
+fn build_neighborhoods<'a>(input: &ArrayView2<'a, f64>, eps: f64) -> Vec<Vec<usize>> {
+    let db = BallTree::new(*input);
+    input
+        .genrows()
+        .into_iter()
+        .map(|p| db.query_radius(&p, eps).into_iter().collect::<Vec<usize>>())
+        .collect()
 }
 
 fn expand_cluster(
