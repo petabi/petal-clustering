@@ -6,24 +6,21 @@ use super::Fit;
 
 pub struct Dbscan {
     pub eps: f64,
-    pub min_cluster_size: usize,
+    pub min_samples: usize,
 }
 
 impl Default for Dbscan {
     fn default() -> Dbscan {
         Dbscan {
             eps: 0.5,
-            min_cluster_size: 5,
+            min_samples: 5,
         }
     }
 }
 
 impl Dbscan {
-    pub fn new(eps: f64, min_cluster_size: usize) -> Self {
-        Dbscan {
-            eps,
-            min_cluster_size,
-        }
+    pub fn new(eps: f64, min_samples: usize) -> Self {
+        Dbscan { eps, min_samples }
     }
 }
 
@@ -44,21 +41,19 @@ impl<'a> Fit<'a> for Dbscan {
             .map(|p| {
                 db.query_radius(&p, self.eps)
                     .into_iter()
-                    .collect::<Vec<_>>()
+                    .collect::<Vec<usize>>()
             })
             .collect();
         let mut visited = vec![false; input.rows()];
         let mut clusters = HashMap::new();
-
         for (idx, neighbors) in neighborhoods.iter().enumerate() {
-            if visited[idx] || neighbors.len() < self.min_cluster_size {
+            if visited[idx] || neighbors.len() < self.min_samples {
                 continue;
             }
-            visited[idx] = true;
 
             let cid = clusters.len();
-            clusters.entry(cid).or_insert_with(|| vec![idx]);
-            self.expand_cluster(idx, cid, &neighborhoods, &mut visited, &mut clusters);
+            let cluster = clusters.entry(cid).or_insert_with(Vec::new);
+            expand_cluster(cluster, &mut visited, idx, self.min_samples, &neighborhoods);
         }
 
         let in_cluster: HashSet<usize> = clusters.values().flatten().cloned().collect();
@@ -70,32 +65,22 @@ impl<'a> Fit<'a> for Dbscan {
     }
 }
 
-impl Dbscan {
-    fn expand_cluster(
-        &mut self,
-        core_idx: usize,
-        cid: usize,
-        neighborhoods: &[Vec<usize>],
-        visited: &mut [bool],
-        clusters: &mut HashMap<usize, Vec<usize>>,
-    ) {
-        let mut cores_to_visit = vec![core_idx];
-        while let Some(cur_core) = cores_to_visit.pop() {
-            for &neighbor in &neighborhoods[cur_core] {
-                if visited[neighbor] {
-                    continue;
-                }
-                clusters
-                    .get_mut(&cid)
-                    .expect("cluster should exist")
-                    .push(neighbor);
-                visited[neighbor] = true;
-                let neighbors = &neighborhoods[neighbor];
-                if neighbors.len() < self.min_cluster_size {
-                    continue;
-                }
-                cores_to_visit.push(neighbor);
-            }
+fn expand_cluster(
+    cluster: &mut Vec<usize>,
+    visited: &mut [bool],
+    idx: usize,
+    min_samples: usize,
+    neighborhoods: &[Vec<usize>],
+) {
+    let mut to_visit = vec![idx];
+    while let Some(cur) = to_visit.pop() {
+        if visited[cur] {
+            continue;
+        }
+        visited[cur] = true;
+        cluster.push(cur);
+        if neighborhoods[cur].len() >= min_samples {
+            to_visit.extend(neighborhoods[cur].iter().filter(|&n| !visited[*n]));
         }
     }
 }
