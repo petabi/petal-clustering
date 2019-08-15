@@ -1,5 +1,6 @@
 use ndarray::ArrayView2;
 use petal_neighbors::BallTree;
+use rayon::prelude::*;
 use std::collections::{HashMap, HashSet};
 
 use super::Fit;
@@ -57,10 +58,9 @@ impl<'a> Fit<'a> for Dbscan {
 }
 
 fn build_neighborhoods<'a>(input: &ArrayView2<'a, f64>, eps: f64) -> Vec<Vec<usize>> {
+    let rows: Vec<_> = input.genrows().into_iter().collect();
     let db = BallTree::new(*input);
-    input
-        .genrows()
-        .into_iter()
+    rows.into_par_iter()
         .map(|p| db.query_radius(&p, eps).into_iter().collect::<Vec<usize>>())
         .collect()
 }

@@ -10,6 +10,7 @@ edition = "2018"
 [dependencies]
 ndarray = "0.12"
 petal-neighbors = {git = "https://github.com/petabi/petal-neighbors.git", rev = "3f0e06c0"}
+rayon = "1.1"
 
 [dev-dependencies]
 rusty-machine = "0.5"
