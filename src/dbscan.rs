@@ -36,7 +36,7 @@ impl<'a> Fit<'a> for Dbscan {
         }
 
         let neighborhoods = build_neighborhoods(&input, self.eps);
-        let mut visited = vec![false; input.rows()];
+        let mut visited = vec![false; input.nrows()];
         let mut clusters = HashMap::new();
         for (idx, neighbors) in neighborhoods.iter().enumerate() {
             if visited[idx] || neighbors.len() < self.min_samples {
@@ -49,7 +49,7 @@ impl<'a> Fit<'a> for Dbscan {
         }
 
         let in_cluster: HashSet<usize> = clusters.values().flatten().cloned().collect();
-        let outliers = (0..input.rows())
+        let outliers = (0..input.nrows())
             .filter(|x| !in_cluster.contains(x))
             .collect();
 
