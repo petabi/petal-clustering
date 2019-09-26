@@ -11,8 +11,8 @@ pub struct Dbscan {
 }
 
 impl Default for Dbscan {
-    fn default() -> Dbscan {
-        Dbscan {
+    fn default() -> Self {
+        Self {
             eps: 0.5,
             min_samples: 5,
         }
@@ -21,7 +21,7 @@ impl Default for Dbscan {
 
 impl Dbscan {
     pub fn new(eps: f64, min_samples: usize) -> Self {
-        Dbscan { eps, min_samples }
+        Self { eps, min_samples }
     }
 }
 
