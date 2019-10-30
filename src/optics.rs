@@ -42,13 +42,13 @@ impl<'a> Fit<'a> for Optics {
                 continue;
             }
             process(
+                idx,
                 &input,
+                self.min_samples,
+                &neighborhoods,
                 &mut ordered,
                 &mut reacheability,
                 &mut visited,
-                idx,
-                self.min_samples,
-                &neighborhoods,
             );
         }
         extract_clusters_and_outliers(
@@ -94,13 +94,13 @@ fn extract_clusters_and_outliers(
 }
 
 fn process<'a>(
+    idx: usize,
     input: &ArrayView2<'a, f64>,
+    min_samples: usize,
+    neighborhoods: &[Neighborhood],
     ordered: &mut Vec<usize>,
     reacheability: &mut Vec<f64>,
     visited: &mut [bool],
-    idx: usize,
-    min_samples: usize,
-    neighborhoods: &[Neighborhood],
 ) {
     let mut to_visit = vec![idx];
     while let Some(cur) = to_visit.pop() {
@@ -114,11 +114,11 @@ fn process<'a>(
         }
         let mut seeds = vec![];
         update(
-            input,
-            &neighborhoods[cur],
             cur,
-            &mut seeds,
+            &neighborhoods[cur],
+            input,
             &visited,
+            &mut seeds,
             reacheability,
         );
         while let Some(s) = seeds.pop() {
@@ -132,11 +132,11 @@ fn process<'a>(
                 continue;
             }
             update(
-                input,
-                &neighborhoods[s],
                 s,
-                &mut seeds,
+                &neighborhoods[s],
+                input,
                 &visited,
+                &mut seeds,
                 reacheability,
             );
         }
@@ -144,11 +144,11 @@ fn process<'a>(
 }
 
 fn update<'a>(
-    input: &ArrayView2<'a, f64>,
-    neighborhood: &Neighborhood,
     id: usize,
-    seeds: &mut Vec<usize>,
+    neighborhood: &Neighborhood,
+    input: &ArrayView2<'a, f64>,
     visited: &[bool],
+    seeds: &mut Vec<usize>,
     reacheability: &mut [f64],
 ) {
     for &o in &neighborhood.neighbors {
