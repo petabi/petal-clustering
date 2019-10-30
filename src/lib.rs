@@ -1,6 +1,8 @@
 mod dbscan;
+mod optics;
 
 pub use dbscan::Dbscan;
+pub use optics::Optics;
 
 pub trait Fit<'a> {
     type Input;
