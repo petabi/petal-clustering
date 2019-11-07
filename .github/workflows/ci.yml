@@ -7,8 +7,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-18.04, macOS-10.14]
-        rust: [1.37.0, stable]
+        os: [ubuntu-latest, macOS-latest, windows-latest]
+        rust: [stable, 1.37.0]
 
     steps:
     - name: Install Rust
@@ -21,7 +21,7 @@ jobs:
     - name: Run tests
       run: cargo test --verbose
     - name: Generate coverage report
-      if: matrix.os == 'ubuntu-18.04' && matrix.rust == 'stable'
+      if: matrix.os == 'ubuntu-latest' && matrix.rust == 'stable'
       run: |
         sudo apt-get install libcurl4-openssl-dev libelf-dev libdw-dev binutils-dev libiberty-dev
         wget https://github.com/SimonKagstrom/kcov/archive/master.tar.gz
@@ -34,16 +34,16 @@ jobs:
         rm -rf kcov-master
         for file in target/debug/petal_clustering-*; do [ -x "${file}" ] || continue; mkdir -p "target/cov/$(basename $file)"; ./kcov-build/usr/local/bin/kcov --exclude-pattern=/.cargo,/usr/lib --verify "target/cov/$(basename $file)" "$file"; done
     - name: Upload coverage to Codecov
-      if: matrix.os == 'ubuntu-18.04' && matrix.rust == 'stable'
+      if: matrix.os == 'ubuntu-latest' && matrix.rust == 'stable'
       uses: codecov/codecov-action@master
       with:
         token: ${{secrets.CODECOV_TOKEN}}
     - name: Install components
-      if: matrix.os == 'ubuntu-18.04' && matrix.rust == 'stable'
+      if: matrix.os == 'ubuntu-latest' && matrix.rust == 'stable'
       run: rustup component add clippy rustfmt
     - name: Check formatting
-      if: matrix.os == 'ubuntu-18.04' && matrix.rust == 'stable'
+      if: matrix.os == 'ubuntu-latest' && matrix.rust == 'stable'
       run: cargo fmt -- --check
     - name: Clippy
-      if: matrix.os == 'ubuntu-18.04' && matrix.rust == 'stable'
+      if: matrix.os == 'ubuntu-latest' && matrix.rust == 'stable'
       run: cargo clippy -- -D warnings -W clippy::pedantic
