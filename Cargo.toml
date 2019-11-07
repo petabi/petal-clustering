@@ -9,7 +9,7 @@ edition = "2018"
 
 [dependencies]
 ndarray = "0.13"
-petal-neighbors = {git = "https://github.com/petabi/petal-neighbors.git", rev = "3fac1a8e"}
+petal-neighbors = {git = "https://github.com/petabi/petal-neighbors.git", rev = "afbdbfb2"}
 rayon = "1"
 
 [dev-dependencies]
