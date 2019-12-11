@@ -1,10 +1,12 @@
 use ndarray::ArrayView2;
 use petal_neighbors::{distance, BallTree};
 use rayon::prelude::*;
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
 use super::Fit;
 
+#[derive(Debug, Deserialize, Serialize)]
 pub struct Dbscan {
     pub eps: f64,
     pub min_samples: usize,
