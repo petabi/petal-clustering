@@ -6,9 +6,14 @@ use std::collections::{HashMap, HashSet};
 
 use super::Fit;
 
+/// DBSCAN (density-based spatial clustering of applications with noise)
+/// clustering algorithm.
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Dbscan {
+    /// The radius of a neighborhood.
     pub eps: f64,
+
+    /// The minimum number of points required to form a dense region.
     pub min_samples: usize,
 }
 
@@ -34,7 +39,7 @@ impl<'a> Fit<'a> for Dbscan {
     type Output = (HashMap<usize, Vec<usize>>, Vec<usize>);
 
     fn fit(&mut self, input: Self::Input) -> Self::Output {
-        // BallTree does not accept an empty input.
+        // `BallTree` does not accept an empty input.
         if input.is_empty() {
             return (HashMap::new(), Vec::new());
         }
