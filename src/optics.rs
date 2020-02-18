@@ -6,10 +6,16 @@ use std::collections::HashMap;
 
 use super::Fit;
 
+/// OPTICS (ordering points to identify the clustering structure) clustering
+/// algorithm.
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Optics {
+    /// The radius of a neighborhood.
     pub eps: f64,
+
+    /// The minimum number of points required to form a dense region.
     pub min_samples: usize,
+
     ordered: Vec<usize>,
     reacheability: Vec<f64>,
     neighborhoods: Vec<Neighborhood>,

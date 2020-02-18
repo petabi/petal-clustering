@@ -1,11 +1,19 @@
 [package]
 name = "petal-clustering"
 version = "0.1.0"
+description = "A collection of clustering algorithms."
+homepage = "https://github.com/petabi/petal-clustering"
+repository = "https://github.com/petabi/petal-clustering"
+license = "Apache-2.0"
 authors = [
     "Min Kim <msk@dolbo.net>",
     "Min Shao <min.shao1988@gmail.com>"
 ]
 edition = "2018"
+exclude = ["./github"]
+
+[badges]
+codecov = { repository = "petabi/petal-clustering", service = "github" }
 
 [dependencies]
 ndarray = "0.13"
