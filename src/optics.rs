@@ -230,39 +230,8 @@ fn reacheability_distance<'a>(
 #[cfg(test)]
 mod test {
     use super::*;
+    use maplit::hashmap;
     use ndarray::aview2;
-
-    fn comparison(
-        data: Vec<f64>,
-        dim: (usize, usize),
-        eps: f64,
-        min_cluster_size: usize,
-    ) -> (HashMap<usize, Vec<usize>>, Vec<usize>) {
-        use rusty_machine::learning::dbscan::DBSCAN;
-        use rusty_machine::learning::UnSupModel;
-        use rusty_machine::linalg::Matrix;
-
-        let (rows, cols) = dim;
-        let inputs = Matrix::new(rows, cols, data);
-
-        let mut model = DBSCAN::new(eps, min_cluster_size);
-        model.train(&inputs).unwrap();
-        let clustering = model.clusters().unwrap();
-
-        let mut clusters = HashMap::new();
-        let mut outliers = vec![];
-
-        for (idx, &cid) in clustering.iter().enumerate() {
-            match cid {
-                Some(cid) => {
-                    let cluster = clusters.entry(cid).or_insert_with(|| vec![]);
-                    cluster.push(idx);
-                }
-                None => outliers.push(idx),
-            }
-        }
-        (clusters, outliers)
-    }
 
     #[test]
     fn optics() {
@@ -282,10 +251,9 @@ mod test {
         for (_, v) in clusters.iter_mut() {
             v.sort_unstable();
         }
-        let answer = comparison(data.iter().flatten().cloned().collect(), (6, 2), 0.5, 2);
 
-        assert_eq!(answer.0, clusters);
-        assert_eq!(answer.1, outliers);
+        assert_eq!(hashmap! {0 => vec![0, 1, 2, 3], 1 => vec![4, 5]}, clusters);
+        assert_eq!(Vec::<usize>::new(), outliers);
     }
 
     #[test]
