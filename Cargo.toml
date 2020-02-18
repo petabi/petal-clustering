@@ -14,4 +14,4 @@ rayon = "1"
 serde = { version = "1",  features = ["derive"] }
 
 [dev-dependencies]
-rusty-machine = "0.5"
+maplit = "1"
