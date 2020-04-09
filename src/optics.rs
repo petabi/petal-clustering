@@ -193,7 +193,7 @@ struct Neighborhood {
 
 fn build_neighborhoods<'a>(input: &ArrayView2<'a, f64>, eps: f64) -> Vec<Neighborhood> {
     let rows: Vec<_> = input.genrows().into_iter().collect();
-    let db = BallTree::with_metric(*input, distance::EUCLIDEAN);
+    let db = BallTree::with_metric(input, distance::EUCLIDEAN);
     rows.into_par_iter()
         .map(|p| {
             let neighbors = db.query_radius(&p, eps).into_iter().collect::<Vec<usize>>();

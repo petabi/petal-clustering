@@ -17,7 +17,7 @@ codecov = { repository = "petabi/petal-clustering", service = "github" }
 
 [dependencies]
 ndarray = "0.13"
-petal-neighbors = "0.1"
+petal-neighbors = "0.2"
 rayon = "1"
 serde = { version = "1",  features = ["derive"] }
 
