@@ -1,4 +1,4 @@
-use ndarray::{ArrayView1, ArrayView2};
+use ndarray::{ArrayBase, ArrayView1, Data, Ix2};
 use petal_neighbors::{distance, BallTree};
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -77,11 +77,11 @@ impl Optics {
     }
 }
 
-impl<'a> Fit<'a> for Optics {
-    type Input = ArrayView2<'a, f64>;
-    type Output = (HashMap<usize, Vec<usize>>, Vec<usize>);
-
-    fn fit(&mut self, input: Self::Input) -> Self::Output {
+impl<D> Fit<ArrayBase<D, Ix2>, (HashMap<usize, Vec<usize>>, Vec<usize>)> for Optics
+where
+    D: Data<Elem = f64> + Sync,
+{
+    fn fit(&mut self, input: &ArrayBase<D, Ix2>) -> (HashMap<usize, Vec<usize>>, Vec<usize>) {
         if input.is_empty() {
             return (HashMap::new(), vec![]);
         }
@@ -95,7 +95,7 @@ impl<'a> Fit<'a> for Optics {
             }
             process(
                 idx,
-                &input,
+                input,
                 self.min_samples,
                 &self.neighborhoods,
                 &mut self.ordered,
@@ -107,15 +107,17 @@ impl<'a> Fit<'a> for Optics {
     }
 }
 
-fn process<'a>(
+fn process<D>(
     idx: usize,
-    input: &ArrayView2<'a, f64>,
+    input: &ArrayBase<D, Ix2>,
     min_samples: usize,
     neighborhoods: &[Neighborhood],
     ordered: &mut Vec<usize>,
     reacheability: &mut Vec<f64>,
     visited: &mut [bool],
-) {
+) where
+    D: Data<Elem = f64>,
+{
     let mut to_visit = vec![idx];
     while let Some(cur) = to_visit.pop() {
         if visited[cur] {
@@ -157,14 +159,16 @@ fn process<'a>(
     }
 }
 
-fn update<'a>(
+fn update<D>(
     id: usize,
     neighborhood: &Neighborhood,
-    input: &ArrayView2<'a, f64>,
+    input: &ArrayBase<D, Ix2>,
     visited: &[bool],
     seeds: &mut Vec<usize>,
     reacheability: &mut [f64],
-) {
+) where
+    D: Data<Elem = f64>,
+{
     for &o in &neighborhood.neighbors {
         if visited[o] {
             continue;
@@ -191,7 +195,10 @@ struct Neighborhood {
     pub core_distance: f64,
 }
 
-fn build_neighborhoods<'a>(input: &ArrayView2<'a, f64>, eps: f64) -> Vec<Neighborhood> {
+fn build_neighborhoods<'a, D>(input: &'a ArrayBase<D, Ix2>, eps: f64) -> Vec<Neighborhood>
+where
+    D: Data<Elem = f64> + Sync,
+{
     let rows: Vec<_> = input.genrows().into_iter().collect();
     let db = BallTree::with_metric(input, distance::EUCLIDEAN);
     rows.into_par_iter()
@@ -219,12 +226,15 @@ fn distance(a: &ArrayView1<f64>, b: &ArrayView1<f64>) -> f64 {
     (a - b).mapv(|x| x.powi(2)).sum().sqrt()
 }
 
-fn reacheability_distance<'a>(
+fn reacheability_distance<D>(
     o: usize,
     p: usize,
-    input: &ArrayView2<'a, f64>,
+    input: &ArrayBase<D, Ix2>,
     neighbors: &Neighborhood,
-) -> f64 {
+) -> f64
+where
+    D: Data<Elem = f64>,
+{
     let dist = distance(&input.row(o), &input.row(p));
     if dist.gt(&neighbors.core_distance) {
         dist
@@ -237,11 +247,11 @@ fn reacheability_distance<'a>(
 mod test {
     use super::*;
     use maplit::hashmap;
-    use ndarray::aview2;
+    use ndarray::{array, aview2};
 
     #[test]
     fn optics() {
-        let data = vec![
+        let data = array![
             [1.0, 2.0],
             [1.1, 2.2],
             [0.9, 1.9],
@@ -249,10 +259,9 @@ mod test {
             [-2.0, 3.0],
             [-2.2, 3.1],
         ];
-        let input = aview2(&data);
 
         let mut model = Optics::new(0.5, 2);
-        let (mut clusters, mut outliers) = model.fit(input);
+        let (mut clusters, mut outliers) = model.fit(&data);
         outliers.sort_unstable();
         for (_, v) in clusters.iter_mut() {
             v.sort_unstable();
@@ -264,9 +273,9 @@ mod test {
 
     #[test]
     fn core_samples() {
-        let data = vec![[0.], [2.], [3.], [4.], [6.], [8.], [10.]];
+        let data = array![[0.], [2.], [3.], [4.], [6.], [8.], [10.]];
         let mut model = Optics::new(1.01, 1);
-        let (clusters, outliers) = model.fit(aview2(&data));
+        let (clusters, outliers) = model.fit(&data);
         assert_eq!(clusters.len(), 5); // {0: [0], 1: [1, 2, 3], 2: [4], 3: [5], 4: [6]}
         assert!(outliers.is_empty());
     }
@@ -277,7 +286,7 @@ mod test {
         let input = aview2(&data);
 
         let mut model = Optics::new(0.5, 2);
-        let (clusters, outliers) = model.fit(input);
+        let (clusters, outliers) = model.fit(&input);
         assert!(clusters.is_empty());
         assert!(outliers.is_empty());
     }
