@@ -5,17 +5,11 @@ pub use dbscan::Dbscan;
 pub use optics::Optics;
 
 /// An interface to train a model.
-pub trait Fit<'a> {
-    type Input;
-    type Output;
-
-    fn fit(&mut self, input: Self::Input) -> Self::Output;
+pub trait Fit<I, O> {
+    fn fit(&mut self, input: &I) -> O;
 }
 
 /// An interface to apply a trained model.
-pub trait Predict<'a> {
-    type Input;
-    type Output;
-
-    fn predict(&mut self, input: Self::Input) -> Self::Output;
+pub trait Predict<I, O> {
+    fn predict(&mut self, input: &I) -> O;
 }
