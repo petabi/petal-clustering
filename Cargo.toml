@@ -1,7 +1,8 @@
 [package]
 name = "petal-clustering"
-version = "0.2.0"
+version = "0.2.1"
 description = "A collection of clustering algorithms."
+readme = "README.md"
 homepage = "https://github.com/petabi/petal-clustering"
 repository = "https://github.com/petabi/petal-clustering"
 license = "Apache-2.0"
