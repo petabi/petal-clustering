@@ -28,6 +28,7 @@ impl Default for Optics {
 }
 
 impl Optics {
+    #[must_use]
     pub fn new(eps: f64, min_samples: usize) -> Self {
         Self {
             eps,
@@ -38,6 +39,7 @@ impl Optics {
         }
     }
 
+    #[must_use]
     pub fn extract_clusters_and_outliers(
         &self,
         eps: f64,
@@ -189,12 +191,7 @@ fn build_neighborhoods<'a>(input: &ArrayView2<'a, f64>, eps: f64) -> Vec<Neighbo
         .map(|p| {
             let neighbors = db.query_radius(&p, eps).into_iter().collect::<Vec<usize>>();
             let core_distance = if neighbors.len() > 1 {
-                let ns = db.query(&p, 2);
-                if ns[0].distance.gt(&ns[1].distance) {
-                    ns[0].distance
-                } else {
-                    ns[1].distance
-                }
+                db.query(&p, 2)[1].distance
             } else {
                 0.0
             };

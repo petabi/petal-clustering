@@ -22,6 +22,7 @@ impl Default for Dbscan {
 }
 
 impl Dbscan {
+    #[must_use]
     pub fn new(eps: f64, min_samples: usize) -> Self {
         Self { eps, min_samples }
     }
