@@ -200,12 +200,12 @@ where
     D: Data<Elem = f64> + Sync,
 {
     let rows: Vec<_> = input.genrows().into_iter().collect();
-    let db = BallTree::with_metric(input, distance::EUCLIDEAN);
+    let db = BallTree::new(input.view(), distance::EUCLIDEAN).unwrap();
     rows.into_par_iter()
         .map(|p| {
             let neighbors = db.query_radius(&p, eps).into_iter().collect::<Vec<usize>>();
             let core_distance = if neighbors.len() > 1 {
-                db.query(&p, 2)[1].distance
+                db.query(&p, 2).1[1]
             } else {
                 0.0
             };
