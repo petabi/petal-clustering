@@ -205,12 +205,7 @@ where
         .map(|p| {
             let neighbors = db.query_radius(&p, eps).into_iter().collect::<Vec<usize>>();
             let core_distance = if neighbors.len() > 1 {
-                let ns = db.query(&p, 2);
-                if ns[0].distance.gt(&ns[1].distance) {
-                    ns[0].distance
-                } else {
-                    ns[1].distance
-                }
+                db.query(&p, 2)[1].distance
             } else {
                 0.0
             };
