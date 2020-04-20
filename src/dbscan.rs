@@ -8,6 +8,21 @@ use super::Fit;
 
 /// DBSCAN (density-based spatial clustering of applications with noise)
 /// clustering algorithm.
+///
+/// # Examples
+///
+/// ```
+/// use ndarray::array;
+/// use petal_clustering::{Dbscan, Fit};
+///
+/// let points = array![[1.0, 2.0], [2.0, 2.0], [2.0, 2.3], [8.0, 7.0], [8.0, 8.0], [25.0, 80.0]];
+/// let clustering = Dbscan::new(3.0, 2).fit(&points);
+///
+/// assert_eq!(clustering.0.len(), 2);        // two clusters found
+/// assert_eq!(clustering.0[&0], [0, 1, 2]);  // the first three points in Cluster 0
+/// assert_eq!(clustering.0[&1], [3, 4]);     // [8.0, 7.0] and [8.0, 8.0] in Cluster 1
+/// assert_eq!(clustering.1, [5]);            // [25.0, 80.0] doesn't belong to any cluster
+/// ```
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Dbscan {
     /// The radius of a neighborhood.

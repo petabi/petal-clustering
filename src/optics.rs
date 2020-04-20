@@ -8,6 +8,20 @@ use super::Fit;
 
 /// OPTICS (ordering points to identify the clustering structure) clustering
 /// algorithm.
+///
+/// # Examples
+///
+/// ```
+/// use ndarray::array;
+/// use petal_clustering::{Optics, Fit};
+///
+/// let points = array![[1.0, 2.0], [2.0, 5.0], [3.0, 6.0], [8.0, 7.0], [8.0, 8.0], [7.0, 3.0]];
+/// let clustering = Optics::new(4.5, 2).fit(&points);
+///
+/// assert_eq!(clustering.0.len(), 2);        // two clusters found
+/// assert_eq!(clustering.0[&0], [0, 1, 2]);  // the first three points in Cluster 0
+/// assert_eq!(clustering.0[&1], [3, 4, 5]);  // the rest in Cluster 1
+/// ```
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Optics {
     /// The radius of a neighborhood.
