@@ -213,8 +213,11 @@ fn build_neighborhoods<'a, D>(input: &'a ArrayBase<D, Ix2>, eps: f64) -> Vec<Nei
 where
     D: Data<Elem = f64> + Sync,
 {
+    if input.nrows() == 0 {
+        return Vec::new();
+    }
     let rows: Vec<_> = input.genrows().into_iter().collect();
-    let db = BallTree::new(input.view(), distance::EUCLIDEAN).unwrap();
+    let db = BallTree::new(input.view(), distance::EUCLIDEAN).expect("non-empty array");
     rows.into_par_iter()
         .map(|p| {
             let neighbors = db.query_radius(&p, eps).into_iter().collect::<Vec<usize>>();
