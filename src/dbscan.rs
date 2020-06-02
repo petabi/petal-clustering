@@ -1,5 +1,5 @@
-use ndarray::{ArrayBase, Data, Ix2};
-use petal_neighbors::{distance, BallTree};
+use ndarray::{Array, ArrayBase, CowArray, Data, Ix2};
+use petal_neighbors::BallTree;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -59,7 +59,13 @@ where
             return (HashMap::new(), Vec::new());
         }
 
-        let neighborhoods = build_neighborhoods(input, self.eps);
+        let neighborhoods = if input.is_standard_layout() {
+            build_neighborhoods(input.view(), self.eps)
+        } else {
+            let input = Array::from_shape_vec(input.raw_dim(), input.iter().cloned().collect())
+                .expect("valid shape");
+            build_neighborhoods(input.view(), self.eps)
+        };
         let mut visited = vec![false; input.nrows()];
         let mut clusters = HashMap::new();
         for (idx, neighbors) in neighborhoods.iter().enumerate() {
@@ -81,17 +87,22 @@ where
     }
 }
 
-fn build_neighborhoods<'a, D>(input: &'a ArrayBase<D, Ix2>, eps: f64) -> Vec<Vec<usize>>
+fn build_neighborhoods<'a, T>(input: T, eps: f64) -> Vec<Vec<usize>>
 where
-    D: Data<Elem = f64> + Sync,
+    T: Into<CowArray<'a, f64, Ix2>>,
 {
+    let input = input.into();
     if input.nrows() == 0 {
         return Vec::new();
     }
     let rows: Vec<_> = input.genrows().into_iter().collect();
-    let db = BallTree::new(input.view(), distance::EUCLIDEAN).expect("non-empty array");
+    let db = BallTree::euclidean(input.view()).expect("non-empty array");
     rows.into_par_iter()
-        .map(|p| db.query_radius(&p, eps).into_iter().collect::<Vec<usize>>())
+        .map(|p| {
+            db.query_radius(p.as_slice().expect("standard row-major layout"), eps)
+                .into_iter()
+                .collect::<Vec<usize>>()
+        })
         .collect()
 }
 
