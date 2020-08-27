@@ -98,11 +98,7 @@ where
     let rows: Vec<_> = input.genrows().into_iter().collect();
     let db = BallTree::euclidean(input.view()).expect("non-empty array");
     rows.into_par_iter()
-        .map(|p| {
-            db.query_radius(p.as_slice().expect("standard row-major layout"), eps)
-                .into_iter()
-                .collect::<Vec<usize>>()
-        })
+        .map(|p| db.query_radius(&p, eps).into_iter().collect::<Vec<usize>>())
         .collect()
 }
 

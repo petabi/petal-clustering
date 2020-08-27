@@ -228,12 +228,9 @@ where
     let db = BallTree::euclidean(input.view()).expect("non-empty array");
     rows.into_par_iter()
         .map(|p| {
-            let neighbors = db
-                .query_radius(p.as_slice().expect("standard row-major layout"), eps)
-                .into_iter()
-                .collect::<Vec<usize>>();
+            let neighbors = db.query_radius(&p, eps).into_iter().collect::<Vec<usize>>();
             let core_distance = if neighbors.len() > 1 {
-                db.query(p.as_slice().unwrap(), 2).1[1]
+                db.query(&p, 2).1[1]
             } else {
                 0.0
             };
