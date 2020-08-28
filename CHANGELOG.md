@@ -7,6 +7,10 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- `Dbscan` and `Optics` can accept an array of `f32`.
+
 ### Documentation
 
 - Examples added to `Dbscan` and `Optics`.
