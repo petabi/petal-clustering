@@ -1,8 +1,10 @@
-use ndarray::{Array, ArrayBase, ArrayView1, CowArray, Data, Ix2};
+use ndarray::{Array, ArrayBase, ArrayView1, Data, Ix2};
+use num_traits::{Float, FromPrimitive};
 use petal_neighbors::BallTree;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::ops::{AddAssign, DivAssign};
 
 use super::Fit;
 
@@ -23,23 +25,26 @@ use super::Fit;
 /// assert_eq!(clustering.0[&1], [3, 4, 5]);  // the rest in Cluster 1
 /// ```
 #[derive(Debug, Deserialize, Serialize)]
-pub struct Optics {
+pub struct Optics<A> {
     /// The radius of a neighborhood.
-    pub eps: f64,
+    pub eps: A,
 
     /// The minimum number of points required to form a dense region.
     pub min_samples: usize,
 
     ordered: Vec<usize>,
-    reacheability: Vec<f64>,
-    neighborhoods: Vec<Neighborhood>,
+    reacheability: Vec<A>,
+    neighborhoods: Vec<Neighborhood<A>>,
 }
 
-impl Default for Optics {
+impl<A> Default for Optics<A>
+where
+    A: Float,
+{
     #[must_use]
     fn default() -> Self {
         Self {
-            eps: 0.5,
+            eps: A::from(0.5_f32).expect("valid float"),
             min_samples: 5,
             ordered: vec![],
             reacheability: vec![],
@@ -48,9 +53,12 @@ impl Default for Optics {
     }
 }
 
-impl Optics {
+impl<A> Optics<A>
+where
+    A: Float,
+{
     #[must_use]
-    pub fn new(eps: f64, min_samples: usize) -> Self {
+    pub fn new(eps: A, min_samples: usize) -> Self {
         Self {
             eps,
             min_samples,
@@ -63,7 +71,7 @@ impl Optics {
     #[must_use]
     pub fn extract_clusters_and_outliers(
         &self,
-        eps: f64,
+        eps: A,
     ) -> (HashMap<usize, Vec<usize>>, Vec<usize>) {
         let mut outliers = vec![];
         let mut clusters: HashMap<usize, Vec<usize>> = HashMap::new();
@@ -91,25 +99,26 @@ impl Optics {
     }
 }
 
-impl<D> Fit<ArrayBase<D, Ix2>, (HashMap<usize, Vec<usize>>, Vec<usize>)> for Optics
+impl<S, A> Fit<ArrayBase<S, Ix2>, (HashMap<usize, Vec<usize>>, Vec<usize>)> for Optics<A>
 where
-    D: Data<Elem = f64> + Sync,
+    A: AddAssign + DivAssign + Float + FromPrimitive + Send + Sync,
+    S: Data<Elem = A> + Sync,
 {
-    fn fit(&mut self, input: &ArrayBase<D, Ix2>) -> (HashMap<usize, Vec<usize>>, Vec<usize>) {
+    fn fit(&mut self, input: &ArrayBase<S, Ix2>) -> (HashMap<usize, Vec<usize>>, Vec<usize>) {
         if input.is_empty() {
             return (HashMap::new(), vec![]);
         }
 
         self.neighborhoods = if input.is_standard_layout() {
-            build_neighborhoods(input.view(), self.eps)
+            build_neighborhoods(input, self.eps)
         } else {
             let input = Array::from_shape_vec(input.raw_dim(), input.iter().cloned().collect())
                 .expect("valid shape");
-            build_neighborhoods(input.view(), self.eps)
+            build_neighborhoods(&input, self.eps)
         };
         let mut visited = vec![false; input.nrows()];
         self.ordered = Vec::with_capacity(input.nrows());
-        self.reacheability = vec![std::f64::NAN; input.nrows()];
+        self.reacheability = vec![A::nan(); input.nrows()];
         for (idx, n) in self.neighborhoods.iter().enumerate() {
             if visited[idx] || n.neighbors.len() < self.min_samples {
                 continue;
@@ -128,16 +137,17 @@ where
     }
 }
 
-fn process<D>(
+fn process<S, A>(
     idx: usize,
-    input: &ArrayBase<D, Ix2>,
+    input: &ArrayBase<S, Ix2>,
     min_samples: usize,
-    neighborhoods: &[Neighborhood],
+    neighborhoods: &[Neighborhood<A>],
     ordered: &mut Vec<usize>,
-    reacheability: &mut Vec<f64>,
+    reacheability: &mut Vec<A>,
     visited: &mut [bool],
 ) where
-    D: Data<Elem = f64>,
+    A: Float,
+    S: Data<Elem = A>,
 {
     let mut to_visit = vec![idx];
     while let Some(cur) = to_visit.pop() {
@@ -180,15 +190,16 @@ fn process<D>(
     }
 }
 
-fn update<D>(
+fn update<S, A>(
     id: usize,
-    neighborhood: &Neighborhood,
-    input: &ArrayBase<D, Ix2>,
+    neighborhood: &Neighborhood<A>,
+    input: &ArrayBase<S, Ix2>,
     visited: &[bool],
     seeds: &mut Vec<usize>,
-    reacheability: &mut [f64],
+    reacheability: &mut [A],
 ) where
-    D: Data<Elem = f64>,
+    A: Float,
+    S: Data<Elem = A>,
 {
     for &o in &neighborhood.neighbors {
         if visited[o] {
@@ -211,16 +222,16 @@ fn update<D>(
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-struct Neighborhood {
+struct Neighborhood<A> {
     pub neighbors: Vec<usize>,
-    pub core_distance: f64,
+    pub core_distance: A,
 }
 
-fn build_neighborhoods<'a, T>(input: T, eps: f64) -> Vec<Neighborhood>
+fn build_neighborhoods<S, A>(input: &ArrayBase<S, Ix2>, eps: A) -> Vec<Neighborhood<A>>
 where
-    T: Into<CowArray<'a, f64, Ix2>>,
+    A: AddAssign + DivAssign + Float + FromPrimitive + Send + Sync,
+    S: Data<Elem = A>,
 {
-    let input = input.into();
     if input.nrows() == 0 {
         return Vec::new();
     }
@@ -232,7 +243,7 @@ where
             let core_distance = if neighbors.len() > 1 {
                 db.query(&p, 2).1[1]
             } else {
-                0.0
+                A::zero()
             };
             Neighborhood {
                 neighbors,
@@ -242,18 +253,22 @@ where
         .collect()
 }
 
-fn distance(a: &ArrayView1<f64>, b: &ArrayView1<f64>) -> f64 {
+fn distance<A>(a: &ArrayView1<A>, b: &ArrayView1<A>) -> A
+where
+    A: Float,
+{
     (a - b).mapv(|x| x.powi(2)).sum().sqrt()
 }
 
-fn reacheability_distance<D>(
+fn reacheability_distance<S, A>(
     o: usize,
     p: usize,
-    input: &ArrayBase<D, Ix2>,
-    neighbors: &Neighborhood,
-) -> f64
+    input: &ArrayBase<S, Ix2>,
+    neighbors: &Neighborhood<A>,
+) -> A
 where
-    D: Data<Elem = f64>,
+    A: Float,
+    S: Data<Elem = A>,
 {
     let dist = distance(&input.row(o), &input.row(p));
     if dist.gt(&neighbors.core_distance) {
@@ -268,6 +283,13 @@ mod test {
     use super::*;
     use maplit::hashmap;
     use ndarray::{array, aview2};
+
+    #[test]
+    fn default() {
+        let optics = Optics::<f32>::default();
+        assert_eq!(optics.eps, 0.5);
+        assert_eq!(optics.min_samples, 5);
+    }
 
     #[test]
     fn optics() {
