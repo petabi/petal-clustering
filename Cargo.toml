@@ -1,11 +1,14 @@
 [package]
 name = "petal-clustering"
-version = "0.2.1"
+version = "0.2.2"
 description = "A collection of clustering algorithms."
 readme = "README.md"
+documentation = "https://docs.rs/petal-clustering"
 homepage = "https://github.com/petabi/petal-clustering"
 repository = "https://github.com/petabi/petal-clustering"
 license = "Apache-2.0"
+keywords = ["clustering", "dbscan", "optics", "unsupervised", "machine-learning"]
+categories = ["algorithms", "data-structures"]
 authors = [
     "Min Kim <msk@dolbo.net>",
     "Min Shao <min.shao1988@gmail.com>"
