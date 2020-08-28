@@ -135,6 +135,13 @@ mod test {
     use ndarray::{array, aview2};
 
     #[test]
+    fn default() {
+        let dbscan = Dbscan::<f32>::default();
+        assert_eq!(dbscan.eps, 0.5);
+        assert_eq!(dbscan.min_samples, 5);
+    }
+
+    #[test]
     fn dbscan() {
         let data = array![
             [1.0, 2.0],

@@ -285,6 +285,13 @@ mod test {
     use ndarray::{array, aview2};
 
     #[test]
+    fn default() {
+        let optics = Optics::<f32>::default();
+        assert_eq!(optics.eps, 0.5);
+        assert_eq!(optics.min_samples, 5);
+    }
+
+    #[test]
     fn optics() {
         let data = array![
             [1.0, 2.0],
