@@ -3,6 +3,19 @@ name: CI
 on: [push, pull_request]
 
 jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Install Rust
+      uses: hecrj/setup-rust-action@v1
+      with:
+        rust-version: stable
+    - uses: actions/checkout@master
+    - name: Check formatting
+      run: cargo fmt -- --check
+    - name: Clippy
+      run: cargo clippy -- -D warnings -W clippy::pedantic
+
   test:
     runs-on: ${{ matrix.os }}
     strategy:
@@ -30,16 +43,3 @@ jobs:
       uses: codecov/codecov-action@master
       with:
         token: ${{secrets.CODECOV_TOKEN}}
-
-  check:
-    runs-on: ubuntu-latest
-    steps:
-    - name: Install Rust
-      uses: hecrj/setup-rust-action@v1
-      with:
-        rust-version: stable
-    - uses: actions/checkout@master
-    - name: Check formatting
-      run: cargo fmt -- --check
-    - name: Clippy
-      run: cargo clippy -- -D warnings -W clippy::pedantic
