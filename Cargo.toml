@@ -1,6 +1,6 @@
 [package]
 name = "petal-clustering"
-version = "0.2.2"
+version = "0.2.3"
 description = "A collection of clustering algorithms."
 readme = "README.md"
 documentation = "https://docs.rs/petal-clustering"
