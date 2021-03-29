@@ -235,7 +235,7 @@ where
     if input.nrows() == 0 {
         return Vec::new();
     }
-    let rows: Vec<_> = input.genrows().into_iter().collect();
+    let rows: Vec<_> = input.rows().into_iter().collect();
     let db = BallTree::euclidean(input.view()).expect("non-empty array");
     rows.into_par_iter()
         .map(|p| {
