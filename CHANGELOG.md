@@ -9,7 +9,8 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
-- Requires Rust 1.42 or later.
+- Requires Rust 1.49 or later.
+- Upgrade ndarray to 0.15.0
 
 ## [0.2.3] - 2020-12-31
 
