@@ -68,7 +68,7 @@ where
         let neighborhoods = if input.is_standard_layout() {
             build_neighborhoods(input, self.eps)
         } else {
-            let input = Array::from_shape_vec(input.raw_dim(), input.iter().cloned().collect())
+            let input = Array::from_shape_vec(input.raw_dim(), input.iter().copied().collect())
                 .expect("valid shape");
             build_neighborhoods(&input, self.eps)
         };
@@ -84,7 +84,7 @@ where
             expand_cluster(cluster, &mut visited, idx, self.min_samples, &neighborhoods);
         }
 
-        let in_cluster: HashSet<usize> = clusters.values().flatten().cloned().collect();
+        let in_cluster: HashSet<usize> = clusters.values().flatten().copied().collect();
         let outliers = (0..input.nrows())
             .filter(|x| !in_cluster.contains(x))
             .collect();
