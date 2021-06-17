@@ -112,7 +112,7 @@ where
         self.neighborhoods = if input.is_standard_layout() {
             build_neighborhoods(input, self.eps)
         } else {
-            let input = Array::from_shape_vec(input.raw_dim(), input.iter().cloned().collect())
+            let input = Array::from_shape_vec(input.raw_dim(), input.iter().copied().collect())
                 .expect("valid shape");
             build_neighborhoods(&input, self.eps)
         };
