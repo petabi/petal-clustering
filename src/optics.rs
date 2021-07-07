@@ -1,6 +1,9 @@
-use ndarray::{Array, ArrayBase, ArrayView1, Data, Ix2};
+use ndarray::{Array, ArrayBase, Data, Ix2};
 use num_traits::{Float, FromPrimitive};
-use petal_neighbors::BallTree;
+use petal_neighbors::{
+    distance::{Euclidean, Metric},
+    BallTree,
+};
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -15,29 +18,33 @@ use super::Fit;
 ///
 /// ```
 /// use ndarray::array;
+/// use petal_neighbors::distance::Euclidean;
 /// use petal_clustering::{Optics, Fit};
 ///
 /// let points = array![[1.0, 2.0], [2.0, 5.0], [3.0, 6.0], [8.0, 7.0], [8.0, 8.0], [7.0, 3.0]];
-/// let clustering = Optics::new(4.5, 2).fit(&points);
+/// let clustering = Optics::new(4.5, 2, Euclidean::default()).fit(&points);
 ///
 /// assert_eq!(clustering.0.len(), 2);        // two clusters found
 /// assert_eq!(clustering.0[&0], [0, 1, 2]);  // the first three points in Cluster 0
 /// assert_eq!(clustering.0[&1], [3, 4, 5]);  // the rest in Cluster 1
 /// ```
 #[derive(Debug, Deserialize, Serialize)]
-pub struct Optics<A> {
+pub struct Optics<A, M> {
     /// The radius of a neighborhood.
     pub eps: A,
 
     /// The minimum number of points required to form a dense region.
     pub min_samples: usize,
 
+    /// The metric to compute distance between the entries.
+    pub metric: M,
+
     ordered: Vec<usize>,
     reacheability: Vec<A>,
     neighborhoods: Vec<Neighborhood<A>>,
 }
 
-impl<A> Default for Optics<A>
+impl<A> Default for Optics<A, Euclidean>
 where
     A: Float,
 {
@@ -46,6 +53,7 @@ where
         Self {
             eps: A::from(0.5_f32).expect("valid float"),
             min_samples: 5,
+            metric: Euclidean::default(),
             ordered: vec![],
             reacheability: vec![],
             neighborhoods: vec![],
@@ -53,15 +61,17 @@ where
     }
 }
 
-impl<A> Optics<A>
+impl<A, M> Optics<A, M>
 where
     A: Float,
+    M: Metric<A>,
 {
     #[must_use]
-    pub fn new(eps: A, min_samples: usize) -> Self {
+    pub fn new(eps: A, min_samples: usize, metric: M) -> Self {
         Self {
             eps,
             min_samples,
+            metric,
             ordered: vec![],
             reacheability: vec![],
             neighborhoods: vec![],
@@ -99,10 +109,11 @@ where
     }
 }
 
-impl<S, A> Fit<ArrayBase<S, Ix2>, (HashMap<usize, Vec<usize>>, Vec<usize>)> for Optics<A>
+impl<S, A, M> Fit<ArrayBase<S, Ix2>, (HashMap<usize, Vec<usize>>, Vec<usize>)> for Optics<A, M>
 where
     A: AddAssign + DivAssign + Float + FromPrimitive + Send + Sync,
     S: Data<Elem = A> + Sync,
+    M: Metric<A> + Clone + Sync,
 {
     fn fit(&mut self, input: &ArrayBase<S, Ix2>) -> (HashMap<usize, Vec<usize>>, Vec<usize>) {
         if input.is_empty() {
@@ -110,11 +121,11 @@ where
         }
 
         self.neighborhoods = if input.is_standard_layout() {
-            build_neighborhoods(input, self.eps)
+            build_neighborhoods(input, self.eps, self.metric.clone())
         } else {
             let input = Array::from_shape_vec(input.raw_dim(), input.iter().copied().collect())
                 .expect("valid shape");
-            build_neighborhoods(&input, self.eps)
+            build_neighborhoods(&input, self.eps, self.metric.clone())
         };
         let mut visited = vec![false; input.nrows()];
         self.ordered = Vec::with_capacity(input.nrows());
@@ -127,6 +138,7 @@ where
                 idx,
                 input,
                 self.min_samples,
+                &self.metric,
                 &self.neighborhoods,
                 &mut self.ordered,
                 &mut self.reacheability,
@@ -137,10 +149,12 @@ where
     }
 }
 
-fn process<S, A>(
+#[allow(clippy::too_many_arguments)]
+fn process<S, A, M>(
     idx: usize,
     input: &ArrayBase<S, Ix2>,
     min_samples: usize,
+    metric: &M,
     neighborhoods: &[Neighborhood<A>],
     ordered: &mut Vec<usize>,
     reacheability: &mut Vec<A>,
@@ -148,6 +162,7 @@ fn process<S, A>(
 ) where
     A: Float,
     S: Data<Elem = A>,
+    M: Metric<A>,
 {
     let mut to_visit = vec![idx];
     while let Some(cur) = to_visit.pop() {
@@ -165,6 +180,7 @@ fn process<S, A>(
             &neighborhoods[cur],
             input,
             &visited,
+            metric,
             &mut seeds,
             reacheability,
         );
@@ -183,6 +199,7 @@ fn process<S, A>(
                 &neighborhoods[s],
                 input,
                 &visited,
+                metric,
                 &mut seeds,
                 reacheability,
             );
@@ -190,22 +207,24 @@ fn process<S, A>(
     }
 }
 
-fn update<S, A>(
+fn update<S, A, M>(
     id: usize,
     neighborhood: &Neighborhood<A>,
     input: &ArrayBase<S, Ix2>,
     visited: &[bool],
+    metric: &M,
     seeds: &mut Vec<usize>,
     reacheability: &mut [A],
 ) where
     A: Float,
     S: Data<Elem = A>,
+    M: Metric<A>,
 {
     for &o in &neighborhood.neighbors {
         if visited[o] {
             continue;
         }
-        let reachdist = reacheability_distance(o, id, input, neighborhood);
+        let reachdist = reacheability_distance(o, id, input, neighborhood, metric);
         if !reacheability[o].is_normal() {
             reacheability[o] = reachdist;
             seeds.push(o);
@@ -227,16 +246,21 @@ struct Neighborhood<A> {
     pub core_distance: A,
 }
 
-fn build_neighborhoods<S, A>(input: &ArrayBase<S, Ix2>, eps: A) -> Vec<Neighborhood<A>>
+fn build_neighborhoods<S, A, M>(
+    input: &ArrayBase<S, Ix2>,
+    eps: A,
+    metric: M,
+) -> Vec<Neighborhood<A>>
 where
     A: AddAssign + DivAssign + Float + FromPrimitive + Send + Sync,
     S: Data<Elem = A>,
+    M: Metric<A> + Sync,
 {
     if input.nrows() == 0 {
         return Vec::new();
     }
     let rows: Vec<_> = input.rows().into_iter().collect();
-    let db = BallTree::euclidean(input.view()).expect("non-empty array");
+    let db = BallTree::new(input.view(), metric).expect("non-empty array");
     rows.into_par_iter()
         .map(|p| {
             let neighbors = db.query_radius(&p, eps).into_iter().collect::<Vec<usize>>();
@@ -253,24 +277,19 @@ where
         .collect()
 }
 
-fn distance<A>(a: &ArrayView1<A>, b: &ArrayView1<A>) -> A
-where
-    A: Float,
-{
-    (a - b).mapv(|x| x.powi(2)).sum().sqrt()
-}
-
-fn reacheability_distance<S, A>(
+fn reacheability_distance<S, A, M>(
     o: usize,
     p: usize,
     input: &ArrayBase<S, Ix2>,
     neighbors: &Neighborhood<A>,
+    metric: &M,
 ) -> A
 where
     A: Float,
     S: Data<Elem = A>,
+    M: Metric<A>,
 {
-    let dist = distance(&input.row(o), &input.row(p));
+    let dist = metric.distance(&input.row(o), &input.row(p));
     if dist.gt(&neighbors.core_distance) {
         dist
     } else {
@@ -286,7 +305,7 @@ mod test {
 
     #[test]
     fn default() {
-        let optics = Optics::<f32>::default();
+        let optics = Optics::<f32, Euclidean>::default();
         assert_eq!(optics.eps, 0.5);
         assert_eq!(optics.min_samples, 5);
     }
@@ -302,7 +321,7 @@ mod test {
             [-2.2, 3.1],
         ];
 
-        let mut model = Optics::new(0.5, 2);
+        let mut model = Optics::new(0.5, 2, Euclidean::default());
         let (mut clusters, mut outliers) = model.fit(&data);
         outliers.sort_unstable();
         for (_, v) in clusters.iter_mut() {
@@ -316,7 +335,7 @@ mod test {
     #[test]
     fn core_samples() {
         let data = array![[0.], [2.], [3.], [4.], [6.], [8.], [10.]];
-        let mut model = Optics::new(1.01, 1);
+        let mut model = Optics::new(1.01, 1, Euclidean::default());
         let (clusters, outliers) = model.fit(&data);
         assert_eq!(clusters.len(), 5); // {0: [0], 1: [1, 2, 3], 2: [4], 3: [5], 4: [6]}
         assert!(outliers.is_empty());
@@ -327,7 +346,7 @@ mod test {
         let data: Vec<[f64; 8]> = vec![];
         let input = aview2(&data);
 
-        let mut model = Optics::new(0.5, 2);
+        let mut model = Optics::new(0.5, 2, Euclidean::default());
         let (clusters, outliers) = model.fit(&input);
         assert!(clusters.is_empty());
         assert!(outliers.is_empty());

@@ -1,6 +1,9 @@
 use ndarray::{Array, ArrayBase, Data, Ix2};
 use num_traits::{Float, FromPrimitive};
-use petal_neighbors::BallTree;
+use petal_neighbors::{
+    distance::{Euclidean, Metric},
+    BallTree,
+};
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -15,10 +18,11 @@ use super::Fit;
 ///
 /// ```
 /// use ndarray::array;
+/// use petal_neighbors::distance::Euclidean;
 /// use petal_clustering::{Dbscan, Fit};
 ///
 /// let points = array![[1.0, 2.0], [2.0, 2.0], [2.0, 2.3], [8.0, 7.0], [8.0, 8.0], [25.0, 80.0]];
-/// let clustering = Dbscan::new(3.0, 2).fit(&points);
+/// let clustering = Dbscan::new(3.0, 2, Euclidean::default()).fit(&points);
 ///
 /// assert_eq!(clustering.0.len(), 2);        // two clusters found
 /// assert_eq!(clustering.0[&0], [0, 1, 2]);  // the first three points in Cluster 0
@@ -26,15 +30,16 @@ use super::Fit;
 /// assert_eq!(clustering.1, [5]);            // [25.0, 80.0] doesn't belong to any cluster
 /// ```
 #[derive(Debug, Deserialize, Serialize)]
-pub struct Dbscan<A> {
+pub struct Dbscan<A, M> {
     /// The radius of a neighborhood.
     pub eps: A,
 
     /// The minimum number of points required to form a dense region.
     pub min_samples: usize,
+    pub metric: M,
 }
 
-impl<A> Default for Dbscan<A>
+impl<A> Default for Dbscan<A, Euclidean>
 where
     A: Float,
 {
@@ -43,21 +48,27 @@ where
         Self {
             eps: A::from(0.5_f32).expect("valid float"),
             min_samples: 5,
+            metric: Euclidean::default(),
         }
     }
 }
 
-impl<A> Dbscan<A> {
+impl<A, M> Dbscan<A, M> {
     #[must_use]
-    pub fn new(eps: A, min_samples: usize) -> Self {
-        Self { eps, min_samples }
+    pub fn new(eps: A, min_samples: usize, metric: M) -> Self {
+        Self {
+            eps,
+            min_samples,
+            metric,
+        }
     }
 }
 
-impl<S, A> Fit<ArrayBase<S, Ix2>, (HashMap<usize, Vec<usize>>, Vec<usize>)> for Dbscan<A>
+impl<S, A, M> Fit<ArrayBase<S, Ix2>, (HashMap<usize, Vec<usize>>, Vec<usize>)> for Dbscan<A, M>
 where
     A: AddAssign + DivAssign + Float + FromPrimitive + Sync,
     S: Data<Elem = A>,
+    M: Metric<A> + Clone + Sync,
 {
     fn fit(&mut self, input: &ArrayBase<S, Ix2>) -> (HashMap<usize, Vec<usize>>, Vec<usize>) {
         // `BallTree` does not accept an empty input.
@@ -66,11 +77,11 @@ where
         }
 
         let neighborhoods = if input.is_standard_layout() {
-            build_neighborhoods(input, self.eps)
+            build_neighborhoods(input, self.eps, self.metric.clone())
         } else {
             let input = Array::from_shape_vec(input.raw_dim(), input.iter().copied().collect())
                 .expect("valid shape");
-            build_neighborhoods(&input, self.eps)
+            build_neighborhoods(&input, self.eps, self.metric.clone())
         };
         let mut visited = vec![false; input.nrows()];
         let mut clusters = HashMap::new();
@@ -93,16 +104,17 @@ where
     }
 }
 
-fn build_neighborhoods<S, A>(input: &ArrayBase<S, Ix2>, eps: A) -> Vec<Vec<usize>>
+fn build_neighborhoods<S, A, M>(input: &ArrayBase<S, Ix2>, eps: A, metric: M) -> Vec<Vec<usize>>
 where
     A: AddAssign + DivAssign + Float + FromPrimitive + Sync,
     S: Data<Elem = A>,
+    M: Metric<A> + Sync,
 {
     if input.nrows() == 0 {
         return Vec::new();
     }
     let rows: Vec<_> = input.rows().into_iter().collect();
-    let db = BallTree::euclidean(input.view()).expect("non-empty array");
+    let db = BallTree::new(input.view(), metric).expect("non-empty array");
     rows.into_par_iter()
         .map(|p| db.query_radius(&p, eps).into_iter().collect::<Vec<usize>>())
         .collect()
@@ -136,7 +148,7 @@ mod test {
 
     #[test]
     fn default() {
-        let dbscan = Dbscan::<f32>::default();
+        let dbscan = Dbscan::<f32, Euclidean>::default();
         assert_eq!(dbscan.eps, 0.5);
         assert_eq!(dbscan.min_samples, 5);
     }
@@ -152,7 +164,7 @@ mod test {
             [-2.2, 3.1],
         ];
 
-        let mut model = Dbscan::new(0.5, 2);
+        let mut model = Dbscan::new(0.5, 2, Euclidean::default());
         let (mut clusters, mut outliers) = model.fit(&data);
         outliers.sort_unstable();
         for (_, v) in clusters.iter_mut() {
@@ -166,7 +178,7 @@ mod test {
     #[test]
     fn dbscan_core_samples() {
         let data = array![[0.], [2.], [3.], [4.], [6.], [8.], [10.]];
-        let mut model = Dbscan::new(1.01, 1);
+        let mut model = Dbscan::new(1.01, 1, Euclidean::default());
         let (clusters, outliers) = model.fit(&data);
         assert_eq!(clusters.len(), 5); // {0: [0], 1: [1, 2, 3], 2: [4], 3: [5], 4: [6]}
         assert!(outliers.is_empty());
@@ -177,7 +189,7 @@ mod test {
         let data: Vec<[f64; 8]> = vec![];
         let input = aview2(&data);
 
-        let mut model = Dbscan::new(0.5, 2);
+        let mut model = Dbscan::new(0.5, 2, Euclidean::default());
         let (clusters, outliers) = model.fit(&input);
         assert!(clusters.is_empty());
         assert!(outliers.is_empty());
