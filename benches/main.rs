@@ -1,5 +1,6 @@
 mod dbscan;
 mod optics;
+mod setup;
 
 use crate::dbscan::build as dbscan_build;
 use crate::optics::build as optics_build;
