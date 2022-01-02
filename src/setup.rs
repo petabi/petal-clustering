@@ -37,8 +37,7 @@ pub fn make_blobs(
         }
     };
     let centers = centers_data.view();
-    let samples_per_center = n_samples / centers.len();
-
+    let samples_per_center = n_samples / centers.nrows();
     let mut data = vec![];
     for center in centers.rows() {
         data.push(make_a_blob(center, samples_per_center, cluster_std, &OsRng));
@@ -90,4 +89,27 @@ fn uniform_centers<R: RngCore>(
         .take(n_centers * n_features)
         .collect();
     Array2::from_shape_vec((n_centers, n_features), data).unwrap()
+}
+
+mod test {
+
+    #[test]
+    fn uniform_centers() {
+        let n = 500;
+        let dim = 3;
+
+        let array = super::make_blobs(n, dim, None, None);
+        assert_eq!(array.ncols(), 3);
+        assert_eq!(array.nrows(), 500 / 3 * 3);
+    }
+
+    #[test]
+    fn fixed_centers() {
+        let n = 6;
+        let dim = 3;
+        let centers = ndarray::arr2(&[[1., 1., 1.], [-1., -1., -1.], [1., -1., 1.]]);
+        let array = super::make_blobs(n, dim, Some(super::CenterConfig::Fixed(centers)), Some(0.4));
+        assert_eq!(array.ncols(), 3);
+        assert_eq!(array.nrows(), 6 / 3 * 3);
+    }
 }
