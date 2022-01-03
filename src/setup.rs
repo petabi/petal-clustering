@@ -26,6 +26,7 @@ pub fn make_blobs(
     n_features: usize,
     center_config: Option<CenterConfig>,
     cluster_std: Option<f64>,
+    random_state: Option<[u8; 32]>,
 ) -> Array2<f64> {
     let center_config = center_config.unwrap_or_default();
     let cluster_std = cluster_std.unwrap_or(DEFAULT_CLUSTER_STD);
@@ -33,14 +34,31 @@ pub fn make_blobs(
     let centers_data = match center_config {
         CenterConfig::Fixed(centers) => centers,
         CenterConfig::Random(n_centers, center_box) => {
-            uniform_centers(n_centers, n_features, center_box, OsRng)
+            if let Some(seed) = &random_state {
+                let seed_rng = StdRng::from_seed(*seed);
+                uniform_centers(n_centers, n_features, center_box, seed_rng)
+            } else {
+                uniform_centers(n_centers, n_features, center_box, OsRng)
+            }
         }
     };
     let centers = centers_data.view();
     let samples_per_center = n_samples / centers.nrows();
     let mut data = vec![];
-    for center in centers.rows() {
-        data.push(make_a_blob(center, samples_per_center, cluster_std, &OsRng));
+    if let Some(seed) = random_state {
+        let seed_rng = StdRng::from_seed(seed);
+        for center in centers.rows() {
+            data.push(make_a_blob(
+                center,
+                samples_per_center,
+                cluster_std,
+                &seed_rng,
+            ));
+        }
+    } else {
+        for center in centers.rows() {
+            data.push(make_a_blob(center, samples_per_center, cluster_std, &OsRng));
+        }
     }
     let blobs: Vec<_> = data
         .iter()
@@ -98,7 +116,13 @@ mod test {
         let n = 500;
         let dim = 3;
 
-        let array = super::make_blobs(n, dim, None, None);
+        let array = super::make_blobs(
+            n,
+            dim,
+            None,
+            None,
+            Some(b"this is a test, this is a test. ".to_owned()),
+        );
         assert_eq!(array.ncols(), 3);
         assert_eq!(array.nrows(), 500 / 3 * 3);
     }
@@ -108,7 +132,13 @@ mod test {
         let n = 6;
         let dim = 3;
         let centers = ndarray::arr2(&[[1., 1., 1.], [-1., -1., -1.], [1., -1., 1.]]);
-        let array = super::make_blobs(n, dim, Some(super::CenterConfig::Fixed(centers)), Some(0.4));
+        let array = super::make_blobs(
+            n,
+            dim,
+            Some(super::CenterConfig::Fixed(centers)),
+            Some(0.4),
+            Some(b"this is a test, this is a test. ".to_owned()),
+        );
         assert_eq!(array.ncols(), 3);
         assert_eq!(array.nrows(), 6 / 3 * 3);
     }

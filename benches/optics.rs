@@ -25,7 +25,7 @@ pub(crate) fn uniform_clusters(c: &mut Criterion) {
     let n = black_box(5000);
     let dim = black_box(3);
 
-    let array = make_blobs(n, dim, None, None);
+    let array = make_blobs(n, dim, None, None, None);
     c.bench_function("uniform_clusters", |b| {
         b.iter(|| {
             let mut model = Optics::new(1., 10, Euclidean::default());
@@ -40,7 +40,7 @@ pub(crate) fn fixed_clusters(c: &mut Criterion) {
     let dim = black_box(3);
     let centers = arr2(&[[1., 1., 1.], [-1., -1., -1.], [1., -1., 1.]]);
 
-    let array = make_blobs(n, dim, Some(CenterConfig::Fixed(centers)), Some(0.4));
+    let array = make_blobs(n, dim, Some(CenterConfig::Fixed(centers)), Some(0.4), None);
 
     c.bench_function("fixed_clusters", |b| {
         b.iter(|| {
