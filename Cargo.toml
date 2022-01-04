@@ -23,7 +23,6 @@ codecov = { repository = "petabi/petal-clustering", service = "github" }
 ndarray = "0.15"
 num-traits = "0.2"
 petal-neighbors = "0.7.1"
-ndarray-rand = "0.14.0"
 rayon = "1"
 serde = { version = "1",  features = ["derive"] }
 
@@ -31,6 +30,7 @@ serde = { version = "1",  features = ["derive"] }
 approx = "0.5"
 criterion = "0.3"
 maplit = "1"
+ndarray-rand = "0.14.0"
 
 [[bench]]
 name = "main"

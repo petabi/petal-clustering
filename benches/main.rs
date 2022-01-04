@@ -1,15 +1,10 @@
-mod dbscan;
-mod optics;
+mod tests;
 
-use crate::dbscan::{
-    build as dbscan_build, fixed_clusters as dbscan_fixed_clusters,
-    uniform_clusters as dbscan_uniform_clusters,
-};
-use crate::optics::{
-    build as optics_build, fixed_clusters as optics_fixed_clusters,
-    uniform_clusters as optics_uniform_clusters,
-};
 use criterion::{criterion_group, criterion_main, Criterion};
+use tests::{
+    dbscan_build, dbscan_fixed_clusters, dbscan_uniform_clusters, optics_build,
+    optics_fixed_clusters, optics_uniform_clusters,
+};
 
 criterion_group! {
 name = benches;
