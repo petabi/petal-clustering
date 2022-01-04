@@ -9,7 +9,7 @@ const DEFAULT_CLUSTER_STD: f64 = 1.0;
 const DEFAULT_N_CENTERS: usize = 3;
 const DEFAULT_CENTER_BOX: (f64, f64) = (-10., 10.);
 
-pub enum CenterConfig {
+pub(crate) enum CenterConfig {
     Fixed(Array2<f64>),
     Random(usize, (f64, f64)),
 }
@@ -21,7 +21,7 @@ impl Default for CenterConfig {
 }
 
 #[must_use]
-pub fn make_blobs(
+pub(crate) fn make_blobs(
     n_samples: usize,
     n_features: usize,
     center_config: Option<CenterConfig>,
@@ -110,6 +110,24 @@ fn uniform_centers<R: RngCore>(
 }
 
 mod test {
+    use ndarray_rand::rand::rngs::OsRng;
+
+    #[test]
+    fn make_a_blob() {
+        let center = ndarray::arr1(&[1., 1., 1.]);
+        let n = 5;
+        let blob = super::make_a_blob(center.view(), 5, 1., &OsRng);
+        assert_eq!(blob.len(), center.ncols() * n);
+    }
+
+    #[test]
+    fn uniform_centers() {
+        let n = 5;
+        let m = 3;
+        let centers = super::uniform_centers(n, m, (-10., 10.), OsRng);
+        assert_eq!(centers.nrows(), n);
+        assert_eq!(centers.ncols(), m);
+    }
 
     #[test]
     fn uniform_centers() {
