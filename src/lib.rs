@@ -1,4 +1,5 @@
 mod dbscan;
+mod hdbscan;
 mod optics;
 
 pub use dbscan::Dbscan;
