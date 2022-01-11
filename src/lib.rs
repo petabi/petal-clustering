@@ -3,6 +3,7 @@ mod hdbscan;
 mod optics;
 
 pub use dbscan::Dbscan;
+pub use hdbscan::HDbscan;
 pub use optics::Optics;
 
 /// An interface to train a model.

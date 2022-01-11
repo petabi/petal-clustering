@@ -110,10 +110,11 @@ fn uniform_centers<R: RngCore>(
 }
 
 mod test {
-    use ndarray_rand::rand::rngs::OsRng;
 
     #[test]
     fn make_a_blob() {
+        use ndarray_rand::rand::rngs::OsRng;
+
         let center = ndarray::arr1(&[1., 1., 1.]);
         let n = 5;
         let blob = super::make_a_blob(center.view(), 5, 1., &OsRng);
@@ -122,6 +123,8 @@ mod test {
 
     #[test]
     fn uniform_centers() {
+        use ndarray_rand::rand::rngs::OsRng;
+
         let n = 5;
         let m = 3;
         let centers = super::uniform_centers(n, m, (-10., 10.), OsRng);
@@ -147,9 +150,11 @@ mod test {
 
     #[test]
     fn fixed_centers() {
+        use ndarray::arr2;
+
         let n = 6;
         let dim = 3;
-        let centers = ndarray::arr2(&[[1., 1., 1.], [-1., -1., -1.], [1., -1., 1.]]);
+        let centers = arr2(&[[1., 1., 1.], [-1., -1., -1.], [1., -1., 1.]]);
         let array = super::make_blobs(
             n,
             dim,
