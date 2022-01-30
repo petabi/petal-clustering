@@ -1,6 +1,7 @@
 use ndarray::{Array1, ArrayBase, ArrayView1, ArrayView2, Data, Ix2};
 use num_traits::{Float, FromPrimitive};
 use serde::{Deserialize, Serialize};
+use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::convert::TryFrom;
 use std::fmt::Debug;
@@ -75,50 +76,7 @@ where
         let sorted_mst = Array1::from_vec(mst);
         let labeled = label(sorted_mst);
         let condensed = Array1::from_vec(condense_mst(labeled.view(), self.min_cluster_size));
-        let stability = get_stability(&condensed.view());
-
-        // Excess of Mass
-        let mut clusters = HashMap::new();
-        let mut is_cluster: HashSet<_> = stability.keys().copied().collect();
-        let mut stability_vec: Vec<_> = stability.iter().collect();
-        stability_vec.sort_unstable_by_key(|v| v.0);
-        for (cluster, s) in stability_vec {
-            if !is_cluster.contains(cluster) {
-                continue;
-            }
-            let members: Vec<_> = condensed
-                .iter()
-                .filter_map(|v| if v.0 == *cluster { Some(v.1) } else { None })
-                .collect();
-            let subtree_stability: A = members
-                .iter()
-                .map(|m| stability.get(m).copied().unwrap_or_else(A::zero))
-                .fold(A::zero(), |mut acc, s| {
-                    acc += s;
-                    acc
-                });
-
-            if subtree_stability <= *s {
-                for m in &members {
-                    is_cluster.remove(m);
-                }
-                clusters.insert(*cluster, members);
-            } else {
-                is_cluster.remove(cluster);
-            }
-        }
-        let mut outliers = vec![false; input.nrows()];
-        for c in clusters.values().flat_map(|v| v.iter()) {
-            outliers[*c] = true;
-        }
-        (
-            clusters,
-            outliers
-                .into_iter()
-                .enumerate()
-                .filter_map(|(id, val)| if val { None } else { Some(id) })
-                .collect(),
-        )
+        find_clusters(&condensed.view())
     }
 }
 
@@ -332,13 +290,112 @@ where
         |mut stability, (parent, _child, lambda, size)| {
             let entry = stability.entry(*parent).or_insert_with(A::zero);
             let birth = births.get(parent).expect("invalid child node.");
-            *entry += *lambda
-                - *birth
-                    * A::try_from(u32::try_from(*size).expect("out of bound"))
-                        .expect("out of bound");
+            *entry += (*lambda - *birth)
+                * A::try_from(u32::try_from(*size).expect("out of bound")).expect("out of bound");
             stability
         },
     )
+}
+
+fn find_clusters<A: Float + AddAssign + Sub + TryFrom<u32>>(
+    condensed_tree: &ArrayView1<(usize, usize, A, usize)>,
+) -> (HashMap<usize, Vec<usize>>, Vec<usize>)
+where
+    <A as TryFrom<u32>>::Error: Debug,
+{
+    let mut stability = get_stability(condensed_tree);
+    let mut nodes: Vec<_> = stability.keys().copied().collect();
+    nodes.sort_unstable();
+    nodes.reverse();
+    nodes.remove(nodes.len() - 1);
+
+    let tree: Vec<_> = condensed_tree
+        .iter()
+        .filter_map(|(p, c, _, s)| if *s > 1 { Some((*p, *c)) } else { None })
+        .collect();
+
+    let mut clusters: HashSet<_> = stability.keys().copied().collect();
+    for node in nodes {
+        let subtree_stability = tree.iter().fold(A::zero(), |acc, (p, c)| {
+            if *p == node {
+                acc + *stability.get(c).expect("corruptted stability dictionary")
+            } else {
+                acc
+            }
+        });
+
+        stability.entry(node).and_modify(|v| {
+            if *v < subtree_stability {
+                clusters.remove(&node);
+                *v = subtree_stability;
+            } else {
+                let bfs = bfs_tree(&tree, node);
+                for child in bfs {
+                    if child != node {
+                        clusters.remove(&child);
+                    }
+                }
+            }
+        });
+    }
+
+    let mut clusters: Vec<_> = clusters.into_iter().collect();
+    clusters.sort_unstable();
+    let clusters: HashMap<_, _> = clusters
+        .into_iter()
+        .enumerate()
+        .map(|(id, c)| (c, id))
+        .collect();
+    let max_parent = condensed_tree
+        .iter()
+        .max_by_key(|v| v.0)
+        .expect("no maximum parent available")
+        .0;
+    let min_parent = condensed_tree
+        .iter()
+        .min_by_key(|v| v.0)
+        .expect("no minimum parent available")
+        .0;
+
+    let mut uf = TreeUnionFind::new(max_parent + 1);
+    for (parent, child, _, _) in condensed_tree {
+        if !clusters.contains_key(child) {
+            uf.union(*parent, *child);
+        }
+    }
+
+    let mut res_clusters: HashMap<_, Vec<_>> = HashMap::new();
+    let mut outliers = vec![];
+    for n in 0..min_parent {
+        let cluster = uf.find(n);
+        if cluster > min_parent {
+            let c = res_clusters.entry(cluster).or_default();
+            c.push(n);
+        } else {
+            outliers.push(n);
+        }
+    }
+    (res_clusters, outliers)
+}
+
+fn bfs_tree(tree: &[(usize, usize)], root: usize) -> Vec<usize> {
+    let mut result = vec![];
+    let mut to_process = HashSet::new();
+    to_process.insert(root);
+    while !to_process.is_empty() {
+        result.extend(to_process.iter());
+        to_process = tree
+            .iter()
+            .filter_map(|(p, c)| {
+                if to_process.contains(p) {
+                    Some(*c)
+                } else {
+                    None
+                }
+            })
+            .collect::<HashSet<_>>();
+    }
+    result
 }
 
 fn bfs_mst<A: Float>(mst: ArrayView1<(usize, usize, A, usize)>, start: usize) -> Vec<usize> {
@@ -362,6 +419,44 @@ fn bfs_mst<A: Float>(mst: ArrayView1<(usize, usize, A, usize)>, start: usize) ->
             .collect();
     }
     result
+}
+
+#[allow(dead_code)]
+#[derive(Debug)]
+struct TreeUnionFind {
+    parent: Vec<usize>,
+    size: Vec<usize>,
+}
+
+#[allow(dead_code)]
+impl TreeUnionFind {
+    fn new(n: usize) -> Self {
+        let parent = (0..n).into_iter().collect();
+        let size = vec![0; n];
+        Self { parent, size }
+    }
+
+    fn find(&mut self, x: usize) -> usize {
+        assert!(x < self.parent.len());
+        if x != self.parent[x] {
+            self.parent[x] = self.find(self.parent[x]);
+        }
+        self.parent[x]
+    }
+
+    fn union(&mut self, x: usize, y: usize) {
+        let xx = self.find(x);
+        let yy = self.find(y);
+
+        match self.size[xx].cmp(&self.size[yy]) {
+            Ordering::Greater => self.parent[yy] = xx,
+            Ordering::Equal => {
+                self.parent[yy] = xx;
+                self.size[xx] += 1;
+            }
+            Ordering::Less => self.parent[xx] = yy,
+        }
+    }
 }
 
 struct UnionFind {
@@ -432,8 +527,12 @@ mod test {
             min_cluster_size: 2,
             metric: Euclidean::default(),
         };
-        let (cluster, _) = hdbscan.fit(&data);
-        assert_eq!(cluster.len(), 2);
+        let (clusters, outliers) = hdbscan.fit(&data);
+        assert_eq!(clusters.len(), 2);
+        assert_eq!(
+            outliers.len(),
+            data.nrows() - clusters.values().fold(0, |acc, v| acc + v.len())
+        );
     }
 
     #[test]
@@ -473,6 +572,22 @@ mod test {
             (4, 6, 9.),
         ]);
         assert_eq!(mst, answer);
+    }
+
+    #[test]
+    fn tree_union_find() {
+        let parent = vec![0, 0, 1, 2, 4];
+        let size = vec![0; 5];
+        let mut uf = super::TreeUnionFind { parent, size };
+        assert_eq!(0, uf.find(3));
+        assert_eq!(vec![0, 0, 0, 0, 4], uf.parent);
+        uf.union(4, 0);
+        assert_eq!(vec![4, 0, 0, 0, 4], uf.parent);
+        assert_eq!(vec![0, 0, 0, 0, 1], uf.size);
+
+        uf = super::TreeUnionFind::new(3);
+        assert_eq!((0..3).into_iter().collect::<Vec<_>>(), uf.parent);
+        assert_eq!(vec![0; 3], uf.size);
     }
 
     #[test]
