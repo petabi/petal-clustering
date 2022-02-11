@@ -427,6 +427,7 @@ fn bfs_mst<A: Float>(mst: ArrayView1<(usize, usize, A, usize)>, start: usize) ->
 struct TreeUnionFind {
     parent: Vec<usize>,
     size: Vec<usize>,
+    is_component: Vec<bool>,
 }
 
 #[allow(dead_code)]
@@ -434,13 +435,19 @@ impl TreeUnionFind {
     fn new(n: usize) -> Self {
         let parent = (0..n).into_iter().collect();
         let size = vec![0; n];
-        Self { parent, size }
+        let is_component = vec![true; n];
+        Self {
+            parent,
+            size,
+            is_component,
+        }
     }
 
     fn find(&mut self, x: usize) -> usize {
         assert!(x < self.parent.len());
         if x != self.parent[x] {
             self.parent[x] = self.find(self.parent[x]);
+            self.is_component[x] = false;
         }
         self.parent[x]
     }
@@ -457,6 +464,14 @@ impl TreeUnionFind {
             }
             Ordering::Less => self.parent[xx] = yy,
         }
+    }
+
+    fn components(&self) -> Vec<usize> {
+        self.is_component
+            .iter()
+            .enumerate()
+            .filter_map(|(idx, v)| if *v { Some(idx) } else { None })
+            .collect()
     }
 }
 
@@ -579,12 +594,19 @@ mod test {
     fn tree_union_find() {
         let parent = vec![0, 0, 1, 2, 4];
         let size = vec![0; 5];
-        let mut uf = super::TreeUnionFind { parent, size };
+        let is_component = vec![true; 5];
+        let mut uf = super::TreeUnionFind {
+            parent,
+            size,
+            is_component,
+        };
         assert_eq!(0, uf.find(3));
         assert_eq!(vec![0, 0, 0, 0, 4], uf.parent);
         uf.union(4, 0);
         assert_eq!(vec![4, 0, 0, 0, 4], uf.parent);
         assert_eq!(vec![0, 0, 0, 0, 1], uf.size);
+        assert_eq!(vec![true, false, false, false, true], uf.is_component);
+        assert_eq!(vec![0, 4], uf.components());
 
         uf = super::TreeUnionFind::new(3);
         assert_eq!((0..3).into_iter().collect::<Vec<_>>(), uf.parent);
