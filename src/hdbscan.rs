@@ -7,6 +7,7 @@ use std::convert::TryFrom;
 use std::fmt::Debug;
 use std::mem::MaybeUninit;
 use std::ops::{AddAssign, Div, DivAssign, Sub};
+use succinct::{BitVecMut, BitVector};
 
 use super::Fit;
 use petal_neighbors::distance::{Euclidean, Metric};
@@ -427,7 +428,7 @@ fn bfs_mst<A: Float>(mst: ArrayView1<(usize, usize, A, usize)>, start: usize) ->
 struct TreeUnionFind {
     parent: Vec<usize>,
     size: Vec<usize>,
-    is_component: Vec<bool>,
+    is_component: BitVector<u64>,
 }
 
 #[allow(dead_code)]
@@ -435,7 +436,10 @@ impl TreeUnionFind {
     fn new(n: usize) -> Self {
         let parent = (0..n).into_iter().collect();
         let size = vec![0; n];
-        let is_component = vec![true; n];
+        let is_component = BitVector::with_fill(
+            u64::try_from(n).expect("fail to build a large enough bit vector"),
+            true,
+        );
         Self {
             parent,
             size,
@@ -447,7 +451,10 @@ impl TreeUnionFind {
         assert!(x < self.parent.len());
         if x != self.parent[x] {
             self.parent[x] = self.find(self.parent[x]);
-            self.is_component[x] = false;
+            self.is_component.set_bit(
+                u64::try_from(x).expect("fail to convert usize to u64"),
+                false,
+            );
         }
         self.parent[x]
     }
@@ -470,7 +477,7 @@ impl TreeUnionFind {
         self.is_component
             .iter()
             .enumerate()
-            .filter_map(|(idx, v)| if *v { Some(idx) } else { None })
+            .filter_map(|(idx, v)| if v { Some(idx) } else { None })
             .collect()
     }
 }
@@ -592,9 +599,11 @@ mod test {
 
     #[test]
     fn tree_union_find() {
+        use succinct::{BitVecMut, BitVector};
+
         let parent = vec![0, 0, 1, 2, 4];
         let size = vec![0; 5];
-        let is_component = vec![true; 5];
+        let is_component = BitVector::with_fill(5, true);
         let mut uf = super::TreeUnionFind {
             parent,
             size,
@@ -605,7 +614,10 @@ mod test {
         uf.union(4, 0);
         assert_eq!(vec![4, 0, 0, 0, 4], uf.parent);
         assert_eq!(vec![0, 0, 0, 0, 1], uf.size);
-        assert_eq!(vec![true, false, false, false, true], uf.is_component);
+        let mut bv = BitVector::with_fill(5, false);
+        bv.set_bit(0, true);
+        bv.set_bit(4, true);
+        assert_eq!(bv, uf.is_component);
         assert_eq!(vec![0, 4], uf.components());
 
         uf = super::TreeUnionFind::new(3);
