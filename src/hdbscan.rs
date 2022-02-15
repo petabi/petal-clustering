@@ -1,4 +1,4 @@
-use ndarray::{Array1, ArrayBase, ArrayView1, ArrayView2, Data, Ix2};
+use ndarray::{Array1, Array2, ArrayBase, ArrayView1, ArrayView2, Data, Ix2};
 use num_traits::{Float, FromPrimitive};
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
@@ -23,6 +23,7 @@ pub struct HDbscan<A, M> {
     pub min_samples: usize,
     pub min_cluster_size: usize,
     pub metric: M,
+    pub boruvka: bool,
 }
 
 impl<A> Default for HDbscan<A, Euclidean>
@@ -37,13 +38,14 @@ where
             min_samples: 15,
             min_cluster_size: 15,
             metric: Euclidean::default(),
+            boruvka: true,
         }
     }
 }
 
 impl<S, A, M> Fit<ArrayBase<S, Ix2>, (HashMap<usize, Vec<usize>>, Vec<usize>)> for HDbscan<A, M>
 where
-    A: AddAssign + DivAssign + Float + FromPrimitive + Sync + TryFrom<u32>,
+    A: AddAssign + DivAssign + Float + FromPrimitive + Sync + TryFrom<u32> + std::fmt::Debug,
     <A as std::convert::TryFrom<u32>>::Error: Debug,
     S: Data<Elem = A>,
     M: Metric<A> + Clone + Sync,
@@ -53,26 +55,32 @@ where
             return (HashMap::new(), Vec::new());
         }
         let db = BallTree::new(input.view(), self.metric.clone()).expect("non-empty array");
-        let core_distances = Array1::from_vec(
-            input
-                .rows()
-                .into_iter()
-                .map(|r| {
-                    db.query(&r, self.min_samples)
-                        .1
-                        .last()
-                        .copied()
-                        .expect("at least one point should be returned")
-                })
-                .collect(),
-        );
-        let mut mst = mst_linkage(
-            input.view(),
-            &self.metric,
-            core_distances.view(),
-            self.alpha,
-        )
-        .into_raw_vec();
+        let mut mst = if self.boruvka {
+            let boruvka = Boruvka::new(db, self.min_samples);
+            boruvka.min_spanning_tree().into_raw_vec()
+        } else {
+            let core_distances = Array1::from_vec(
+                input
+                    .rows()
+                    .into_iter()
+                    .map(|r| {
+                        db.query(&r, self.min_samples)
+                            .1
+                            .last()
+                            .copied()
+                            .expect("at least one point should be returned")
+                    })
+                    .collect(),
+            );
+            mst_linkage(
+                input.view(),
+                &self.metric,
+                core_distances.view(),
+                self.alpha,
+            )
+            .into_raw_vec()
+        };
+
         mst.sort_unstable_by(|a, b| a.2.partial_cmp(&(b.2)).expect("invalid distance"));
         let sorted_mst = Array1::from_vec(mst);
         let labeled = label(sorted_mst);
@@ -480,6 +488,10 @@ impl TreeUnionFind {
             .filter_map(|(idx, v)| if v { Some(idx) } else { None })
             .collect()
     }
+
+    fn num_components(&self) -> usize {
+        self.is_component.iter().filter(|b| *b).count()
+    }
 }
 
 struct UnionFind {
@@ -527,6 +539,406 @@ impl UnionFind {
     }
 }
 
+#[allow(dead_code)]
+struct Boruvka<'a, A, M>
+where
+    A: Float,
+    M: Metric<A>,
+{
+    db: BallTree<'a, A, M>,
+    min_samples: usize,
+    candidates: Candidates<A>,
+    components: Components,
+    core_distances: Array1<A>,
+    bounds: Vec<A>,
+    mst: Vec<(usize, usize, A)>,
+}
+
+#[allow(dead_code)]
+impl<'a, A, M> Boruvka<'a, A, M>
+where
+    A: Float + AddAssign + DivAssign + FromPrimitive + std::fmt::Debug,
+    M: Metric<A>,
+{
+    fn new(db: BallTree<'a, A, M>, min_samples: usize) -> Self {
+        let mut candidates = Candidates::new(db.points.nrows());
+        let components = Components::new(db.nodes.len(), db.points.nrows());
+        let bounds = vec![A::max_value(); db.nodes.len()];
+        let core_distances = compute_core_distances(&db, min_samples, &mut candidates);
+        let mst = Vec::with_capacity(db.points.nrows() - 1);
+        Boruvka {
+            db,
+            min_samples,
+            candidates,
+            components,
+            core_distances,
+            bounds,
+            mst,
+        }
+    }
+
+    fn min_spanning_tree(mut self) -> Array1<(usize, usize, A)> {
+        let mut num_components = self.update_components();
+
+        while num_components > 1 {
+            self.traversal(0, 0);
+            num_components = self.update_components();
+        }
+        Array1::from_vec(self.mst)
+    }
+
+    fn update_components(&mut self) -> usize {
+        let components = self.components.get_current();
+        for i in components {
+            let (src, sink, dist) = match self.candidates.get(i) {
+                Some((src, sink, dist)) => (src, sink, dist),
+                None => continue,
+            };
+
+            if self.components.add(src, sink).is_none() {
+                self.candidates.reset(i);
+                continue;
+            }
+
+            self.candidates.distances[i] = A::max_value();
+
+            self.mst.push((src, sink, dist));
+
+            if self.mst.len() == self.num_points() - 1 {
+                return self.components.len();
+            }
+        }
+        self.components.update_points();
+        for n in (0..self.num_nodes()).rev() {
+            let node = &self.db.nodes[n];
+            if node.is_leaf {
+                let mut iter = self.db.idx[node.range.clone()]
+                    .iter()
+                    .map(|idx| self.components.point[*idx]);
+                let component = iter.next().expect("empty node");
+
+                if iter.all(|c| c == component) {
+                    self.components.node[n] =
+                        u32::try_from(component).expect("overflow components");
+                }
+                continue;
+            }
+            let left = 2 * n + 1;
+            let right = left + 1;
+            if self.components.node[left] == self.components.node[right]
+                && self.components.node[left] != u32::MAX
+            {
+                self.components.node[n] = self.components.node[left];
+            }
+        }
+        self.reset_bounds();
+        self.components.len()
+    }
+
+    // calculate minimum distance between the nodes:
+    //   max(||n1_centroid - n2_centroid|| - R_n1 - R_n2, 0)
+    fn min_node_distance(&self, n1: usize, n2: usize) -> A {
+        assert!(n1 < self.db.nodes.len() && n2 < self.db.nodes.len());
+        let n1 = &self.db.nodes[n1];
+        let n2 = &self.db.nodes[n2];
+        let dist = self
+            .db
+            .metric
+            .distance(&n1.centroid.view(), &n2.centroid.view())
+            - n1.radius
+            - n2.radius;
+        if A::zero() > dist {
+            A::zero()
+        } else {
+            dist
+        }
+    }
+
+    fn traversal(&mut self, query: usize, reference: usize) {
+        // prune min{||query - ref||} >= bound_query
+        let node_dist = self.min_node_distance(query, reference);
+        if node_dist >= self.bounds[query] {
+            return;
+        }
+        // prune when query and ref are in the same component
+        if self.components.node[query] == self.components.node[reference]
+            && self.components.node[query] != u32::MAX
+        {
+            return;
+        }
+
+        let n1 = &self.db.nodes[query];
+        let n2 = &self.db.nodes[reference];
+        match (n1.is_leaf, n2.is_leaf, n1.radius < n2.radius) {
+            // for every node in query node, try to find point in reference node that offers smaller mreach
+            // mreach(p, q) = max{core_p, core_q, ||p - q||}
+            (true, true, _) => {
+                let mut lower = A::max_value();
+                let mut upper = A::zero();
+                for &i in &self.db.idx[n1.range.clone()] {
+                    let c1 = self.components.point[i];
+                    // mreach(i, j) >= core_i > candidate[c1]
+                    // i.e. current best candidate for component c1 => prune
+                    if self.core_distances[i] > self.candidates.distances[c1] {
+                        continue;
+                    }
+                    for &j in &self.db.idx[n2.range.clone()] {
+                        let c2 = self.components.point[j];
+                        // mreach(i, j) >= core_j > candidate[c1] => prune
+                        // i, j in the same component => prune
+                        if self.core_distances[j] > self.candidates.distances[c1] || c1 == c2 {
+                            continue;
+                        }
+
+                        let mut mreach = self
+                            .db
+                            .metric
+                            .distance(&self.db.points.row(i), &self.db.points.row(j));
+                        if self.core_distances[j] > mreach {
+                            mreach = self.core_distances[j];
+                        }
+                        if self.core_distances[i] > mreach {
+                            mreach = self.core_distances[i];
+                        }
+
+                        if mreach < self.candidates.distances[c1] {
+                            self.candidates.update(c1, (i, j, mreach));
+                        }
+                    }
+                    if self.candidates.distances[c1] < lower {
+                        lower = self.candidates.distances[c1];
+                    }
+                    if self.candidates.distances[c1] > upper {
+                        upper = self.candidates.distances[c1];
+                    }
+                }
+
+                let mut bound = lower + A::from(2).expect("conversion failure") * n1.radius;
+                if bound > upper {
+                    bound = upper;
+                }
+                if bound < self.bounds[query] {
+                    self.bounds[query] = bound;
+                    let mut cur = query;
+                    while cur > 0 {
+                        let p = (cur - 1) / 2;
+                        let new_bound = self.bound(p);
+                        if new_bound >= self.bounds[p] {
+                            break;
+                        }
+                        self.bounds[p] = new_bound;
+                        cur = p;
+                    }
+                }
+            }
+            (true, _, _) | (false, false, true) => {
+                let left = 2 * reference + 1;
+                let right = left + 1;
+                let left_dist = self.min_node_distance(query, left);
+                let right_dist = self.min_node_distance(query, right);
+
+                if left_dist < right_dist {
+                    self.traversal(query, left);
+                    self.traversal(query, right);
+                } else {
+                    self.traversal(query, right);
+                    self.traversal(query, left);
+                }
+            }
+            _ => {
+                let left = 2 * query + 1;
+                let right = left + 1;
+                let left_dist = self.min_node_distance(reference, left);
+                let right_dist = self.min_node_distance(reference, right);
+
+                if left_dist < right_dist {
+                    self.traversal(reference, left);
+                    self.traversal(reference, right);
+                } else {
+                    self.traversal(reference, right);
+                    self.traversal(reference, left);
+                }
+            }
+        }
+    }
+
+    fn reset_bounds(&mut self) {
+        self.bounds.iter_mut().for_each(|v| *v = A::max_value());
+    }
+
+    fn lower_bound(&self, node: usize, parent: usize) -> A {
+        self.bounds[node]
+            + A::from(2).expect("unexpected conversion failure")
+                * (self.db.nodes[parent].radius - self.db.nodes[node].radius)
+    }
+
+    fn bound(&self, parent: usize) -> A {
+        let left = 2 * parent + 1;
+        let right = left + 1;
+
+        let upper = if self.bounds[left] > self.bounds[right] {
+            self.bounds[left]
+        } else {
+            self.bounds[right]
+        };
+
+        let lower_left = self.lower_bound(left, parent);
+        let lower_right = self.lower_bound(right, parent);
+        let lower = if lower_left > lower_right {
+            lower_right
+        } else {
+            lower_left
+        };
+
+        if lower > A::zero() && lower < upper {
+            lower
+        } else {
+            upper
+        }
+    }
+
+    fn num_points(&self) -> usize {
+        self.db.points.nrows()
+    }
+
+    fn num_nodes(&self) -> usize {
+        self.db.nodes.len()
+    }
+
+    fn idx(&self, i: usize) -> usize {
+        self.db.idx[i]
+    }
+}
+
+// TODO: parallel processing
+fn compute_core_distances<'a, A, M>(
+    db: &BallTree<'a, A, M>,
+    min_samples: usize,
+    candidates: &mut Candidates<A>,
+) -> Array1<A>
+where
+    A: AddAssign + DivAssign + FromPrimitive + Float + std::fmt::Debug,
+    M: Metric<A>,
+{
+    let mut knn_dist: Array2<MaybeUninit<A>> = Array2::uninit((db.points.nrows(), min_samples));
+    let mut knn_indices: Array2<MaybeUninit<usize>> =
+        Array2::uninit((db.points.nrows(), min_samples));
+    for (i, row) in db.points.rows().into_iter().enumerate() {
+        let (indices, dist) = db.query(&row, min_samples);
+        Array1::from_vec(indices).assign_to(knn_indices.row_mut(i));
+        Array1::from_vec(dist).assign_to(knn_dist.row_mut(i));
+    }
+    let (knn_dist, knn_indices) = unsafe { (knn_dist.assume_init(), knn_indices.assume_init()) };
+
+    let core_distances = knn_dist.column(min_samples - 1).to_owned();
+
+    for (n, row) in knn_indices.rows().into_iter().enumerate() {
+        for val in row.into_iter().skip(1).rev() {
+            if core_distances[*val] <= core_distances[n] {
+                candidates.update(n, (n, *val, core_distances[n]));
+            }
+        }
+    }
+
+    core_distances
+}
+
+#[allow(dead_code)]
+struct Candidates<A> {
+    points: Vec<u32>,
+    neighbors: Vec<u32>,
+    distances: Vec<A>,
+}
+
+#[allow(dead_code)]
+impl<A: Float> Candidates<A> {
+    fn new(n: usize) -> Self {
+        // define max_value as NULL
+        let neighbors = vec![u32::max_value(); n];
+        // define max_value as NULL
+        let points = vec![u32::max_value(); n];
+        // define max_value as infinite far
+        let distances = vec![A::max_value(); n];
+        Self {
+            points,
+            neighbors,
+            distances,
+        }
+    }
+
+    fn get(&self, i: usize) -> Option<(usize, usize, A)> {
+        if self.is_undefined(i) {
+            None
+        } else {
+            Some((
+                usize::try_from(self.points[i]).expect("fail to convert points"),
+                usize::try_from(self.neighbors[i]).expect("fail to convert neighbor"),
+                self.distances[i],
+            ))
+        }
+    }
+
+    fn update(&mut self, i: usize, val: (usize, usize, A)) {
+        self.distances[i] = val.2;
+        self.points[i] = u32::try_from(val.0).expect("candidate index overflow");
+        self.neighbors[i] = u32::try_from(val.1).expect("candidate index overflow");
+    }
+
+    fn reset(&mut self, i: usize) {
+        self.points[i] = u32::max_value();
+        self.neighbors[i] = u32::max_value();
+        self.distances[i] = A::max_value();
+    }
+
+    fn is_undefined(&self, i: usize) -> bool {
+        self.points[i] == u32::max_value() || self.neighbors[i] == u32::max_value()
+    }
+}
+
+#[allow(dead_code)]
+struct Components {
+    point: Vec<usize>,
+    node: Vec<u32>,
+    uf: TreeUnionFind,
+}
+
+#[allow(dead_code)]
+impl Components {
+    fn new(m: usize, n: usize) -> Self {
+        // each point started as its own component.
+        let point = (0..n).into_iter().collect();
+        // the component of the node is concluded when
+        // all the enclosed points are in the same component
+        let node = vec![u32::MAX; m];
+        let uf = TreeUnionFind::new(n);
+        Self { point, node, uf }
+    }
+
+    fn add(&mut self, src: usize, sink: usize) -> Option<()> {
+        let current_src = self.uf.find(src);
+        let current_sink = self.uf.find(sink);
+        if current_src == current_sink {
+            return None;
+        }
+        self.uf.union(current_src, current_sink);
+        Some(())
+    }
+
+    fn update_points(&mut self) {
+        for i in 0..self.point.len() {
+            self.point[i] = self.uf.find(i);
+        }
+    }
+
+    fn get_current(&self) -> Vec<usize> {
+        self.uf.components()
+    }
+
+    fn len(&self) -> usize {
+        self.uf.num_components()
+    }
+}
+
 mod test {
 
     #[test]
@@ -549,6 +961,7 @@ mod test {
             min_samples: 2,
             min_cluster_size: 2,
             metric: Euclidean::default(),
+            boruvka: false,
         };
         let (clusters, outliers) = hdbscan.fit(&data);
         assert_eq!(clusters.len(), 2);
@@ -595,6 +1008,36 @@ mod test {
             (4, 6, 9.),
         ]);
         assert_eq!(mst, answer);
+    }
+
+    #[test]
+    fn boruvka() {
+        use ndarray::{arr1, arr2};
+        use petal_neighbors::{distance::Euclidean, BallTree};
+
+        let input = arr2(&[
+            [0., 0.],
+            [7., 0.],
+            [15., 0.],
+            [0., -5.],
+            [15., -5.],
+            [7., -7.],
+            [15., -14.],
+        ]);
+
+        let db = BallTree::new(input, Euclidean::default()).unwrap();
+        let boruvka = super::Boruvka::new(db, 2);
+        let mst = boruvka.min_spanning_tree();
+
+        let answer = arr1(&[
+            (0, 3, 5.0),
+            (1, 0, 7.0),
+            (2, 4, 5.0),
+            (5, 1, 7.0),
+            (6, 4, 9.0),
+            (1, 2, 8.0),
+        ]);
+        assert_eq!(answer, mst);
     }
 
     #[test]
