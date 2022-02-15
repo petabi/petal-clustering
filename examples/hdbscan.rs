@@ -38,6 +38,7 @@ fn main() {
         min_samples,
         min_cluster_size,
         metric: Euclidean::default(),
+        boruvka: true,
     };
     let (clusters, outliers) = clustering.fit(&data.view());
     println!("========= Report =========");
