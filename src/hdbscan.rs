@@ -88,13 +88,14 @@ fn mst_linkage<A: Float>(
 ) -> Array1<(usize, usize, A)> {
     let nrows = input.nrows();
 
-    assert!(
-        !(nrows != core_distances.len()),
+    assert_eq!(
+        nrows,
+        core_distances.len(),
         "dimensions of distance_metric and core_distances should match"
     );
 
     assert!(
-        !(nrows < 2),
+        nrows >= 2,
         "dimensions of distance_metric and core_distances should be greater than 1"
     );
 
