@@ -1,5 +1,6 @@
-use ndarray::{Array1, Array2, ArrayBase, ArrayView1, ArrayView2, Data, Ix2};
+use ndarray::{Array1, ArrayBase, ArrayView1, ArrayView2, Data, Ix2};
 use num_traits::{Float, FromPrimitive};
+use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
@@ -45,10 +46,10 @@ where
 
 impl<S, A, M> Fit<ArrayBase<S, Ix2>, (HashMap<usize, Vec<usize>>, Vec<usize>)> for HDbscan<A, M>
 where
-    A: AddAssign + DivAssign + Float + FromPrimitive + Sync + TryFrom<u32> + std::fmt::Debug,
+    A: AddAssign + DivAssign + Float + FromPrimitive + Sync + Send + TryFrom<u32> + std::fmt::Debug,
     <A as std::convert::TryFrom<u32>>::Error: Debug,
     S: Data<Elem = A>,
-    M: Metric<A> + Clone + Sync,
+    M: Metric<A> + Clone + Sync + Send,
 {
     fn fit(&mut self, input: &ArrayBase<S, Ix2>) -> (HashMap<usize, Vec<usize>>, Vec<usize>) {
         if input.is_empty() {
@@ -557,8 +558,8 @@ where
 #[allow(dead_code)]
 impl<'a, A, M> Boruvka<'a, A, M>
 where
-    A: Float + AddAssign + DivAssign + FromPrimitive + std::fmt::Debug,
-    M: Metric<A>,
+    A: Float + AddAssign + DivAssign + FromPrimitive + Sync + Send + std::fmt::Debug,
+    M: Metric<A> + Sync + Send,
 {
     fn new(db: BallTree<'a, A, M>, min_samples: usize) -> Self {
         let mut candidates = Candidates::new(db.points.nrows());
@@ -637,6 +638,7 @@ where
 
     // calculate minimum distance between the nodes:
     //   max(||n1_centroid - n2_centroid|| - R_n1 - R_n2, 0)
+    #[inline]
     fn min_node_distance(&self, n1: usize, n2: usize) -> A {
         assert!(n1 < self.db.nodes.len() && n2 < self.db.nodes.len());
         let n1 = &self.db.nodes[n1];
@@ -817,30 +819,35 @@ fn compute_core_distances<'a, A, M>(
     candidates: &mut Candidates<A>,
 ) -> Array1<A>
 where
-    A: AddAssign + DivAssign + FromPrimitive + Float + std::fmt::Debug,
-    M: Metric<A>,
+    A: AddAssign + DivAssign + FromPrimitive + Float + Sync + Send + std::fmt::Debug,
+    M: Metric<A> + Sync + Send,
 {
-    let mut knn_dist: Array2<MaybeUninit<A>> = Array2::uninit((db.points.nrows(), min_samples));
-    let mut knn_indices: Array2<MaybeUninit<usize>> =
-        Array2::uninit((db.points.nrows(), min_samples));
-    for (i, row) in db.points.rows().into_iter().enumerate() {
-        let (indices, dist) = db.query(&row, min_samples);
-        Array1::from_vec(indices).assign_to(knn_indices.row_mut(i));
-        Array1::from_vec(dist).assign_to(knn_dist.row_mut(i));
-    }
-    let (knn_dist, knn_indices) = unsafe { (knn_dist.assume_init(), knn_indices.assume_init()) };
+    let mut knn_indices = vec![0; db.points.nrows() * min_samples];
+    let mut core_distances = vec![A::zero(); db.points.nrows()];
+    let rows: Vec<(usize, (&mut [usize], &mut A))> = knn_indices
+        .chunks_mut(min_samples)
+        .zip(core_distances.iter_mut())
+        .enumerate()
+        .collect();
+    rows.into_par_iter().for_each(|(i, (indices, dist))| {
+        let row = db.points.row(i);
+        let (idx, d) = db.query(&row, min_samples);
+        indices.clone_from_slice(&idx);
+        *dist = *d.last().expect("ball tree query failed");
+    });
 
-    let core_distances = knn_dist.column(min_samples - 1).to_owned();
-
-    for (n, row) in knn_indices.rows().into_iter().enumerate() {
-        for val in row.into_iter().skip(1).rev() {
-            if core_distances[*val] <= core_distances[n] {
-                candidates.update(n, (n, *val, core_distances[n]));
+    knn_indices
+        .chunks_exact(min_samples)
+        .enumerate()
+        .for_each(|(n, row)| {
+            for val in row.into_iter().skip(1).rev() {
+                if core_distances[*val] <= core_distances[n] {
+                    candidates.update(n, (n, *val, core_distances[n]));
+                }
             }
-        }
-    }
+        });
 
-    core_distances
+    Array1::from_vec(core_distances)
 }
 
 #[allow(dead_code)]
