@@ -157,7 +157,7 @@ fn process<S, A, M>(
     metric: &M,
     neighborhoods: &[Neighborhood<A>],
     ordered: &mut Vec<usize>,
-    reacheability: &mut Vec<A>,
+    reacheability: &mut [A],
     visited: &mut [bool],
 ) where
     A: Float,

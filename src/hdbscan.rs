@@ -605,60 +605,41 @@ where
 
             self.mst.push((src, sink, dist));
 
-            if self.mst.len() == self.num_points() - 1 {
+            if self.mst.len() == self.db.num_points() - 1 {
                 return self.components.len();
             }
         }
         self.components.update_points();
-        for n in (0..self.num_nodes()).rev() {
-            let node = &self.db.nodes[n];
-            if node.is_leaf {
-                let mut iter = self.db.idx[node.range.clone()]
-                    .iter()
-                    .map(|idx| self.components.point[*idx]);
-                let component = iter.next().expect("empty node");
-
-                if iter.all(|c| c == component) {
-                    self.components.node[n] =
-                        u32::try_from(component).expect("overflow components");
+        for n in (0..self.db.num_nodes()).rev() {
+            match self.db.children_of(n) {
+                None => {
+                    let mut points = self
+                        .db
+                        .points_of(n)
+                        .iter()
+                        .map(|i| self.components.point[*i]);
+                    let pivot = points.next().expect("empty node");
+                    if points.all(|c| c == pivot) {
+                        self.components.node[n] =
+                            u32::try_from(pivot).expect("overflow components");
+                    }
                 }
-                continue;
-            }
-            let left = 2 * n + 1;
-            let right = left + 1;
-            if self.components.node[left] == self.components.node[right]
-                && self.components.node[left] != u32::MAX
-            {
-                self.components.node[n] = self.components.node[left];
+                Some((left, right)) => {
+                    if self.components.node[left] == self.components.node[right]
+                        && self.components.node[left] != u32::MAX
+                    {
+                        self.components.node[n] = self.components.node[left];
+                    }
+                }
             }
         }
         self.reset_bounds();
         self.components.len()
     }
 
-    // calculate minimum distance between the nodes:
-    //   max(||n1_centroid - n2_centroid|| - R_n1 - R_n2, 0)
-    #[inline]
-    fn min_node_distance(&self, n1: usize, n2: usize) -> A {
-        assert!(n1 < self.db.nodes.len() && n2 < self.db.nodes.len());
-        let n1 = &self.db.nodes[n1];
-        let n2 = &self.db.nodes[n2];
-        let dist = self
-            .db
-            .metric
-            .distance(&n1.centroid.view(), &n2.centroid.view())
-            - n1.radius
-            - n2.radius;
-        if A::zero() > dist {
-            A::zero()
-        } else {
-            dist
-        }
-    }
-
     fn traversal(&mut self, query: usize, reference: usize) {
         // prune min{||query - ref||} >= bound_query
-        let node_dist = self.min_node_distance(query, reference);
+        let node_dist = self.db.node_distance_lower_bound(query, reference);
         if node_dist >= self.bounds[query] {
             return;
         }
@@ -669,22 +650,24 @@ where
             return;
         }
 
-        let n1 = &self.db.nodes[query];
-        let n2 = &self.db.nodes[reference];
-        match (n1.is_leaf, n2.is_leaf, n1.radius < n2.radius) {
-            // for every node in query node, try to find point in reference node that offers smaller mreach
-            // mreach(p, q) = max{core_p, core_q, ||p - q||}
-            (true, true, _) => {
+        let query_children = self.db.children_of(query);
+        let ref_children = self.db.children_of(reference);
+        match (
+            query_children,
+            ref_children,
+            self.db.compare_nodes(query, reference),
+        ) {
+            (None, None, _) => {
                 let mut lower = A::max_value();
                 let mut upper = A::zero();
-                for &i in &self.db.idx[n1.range.clone()] {
+                for &i in self.db.points_of(query) {
                     let c1 = self.components.point[i];
                     // mreach(i, j) >= core_i > candidate[c1]
                     // i.e. current best candidate for component c1 => prune
                     if self.core_distances[i] > self.candidates.distances[c1] {
                         continue;
                     }
-                    for &j in &self.db.idx[n2.range.clone()] {
+                    for &j in self.db.points_of(reference) {
                         let c2 = self.components.point[j];
                         // mreach(i, j) >= core_j > candidate[c1] => prune
                         // i, j in the same component => prune
@@ -715,7 +698,8 @@ where
                     }
                 }
 
-                let mut bound = lower + A::from(2).expect("conversion failure") * n1.radius;
+                let radius = self.db.radius_of(query);
+                let mut bound = lower + radius + radius;
                 if bound > upper {
                     bound = upper;
                 }
@@ -733,13 +717,12 @@ where
                     }
                 }
             }
-            (true, _, _) | (false, false, true) => {
-                let left = 2 * reference + 1;
-                let right = left + 1;
-                let left_dist = self.min_node_distance(query, left);
-                let right_dist = self.min_node_distance(query, right);
+            (None, Some((left, right)), _)
+            | (_, Some((left, right)), Some(std::cmp::Ordering::Less)) => {
+                let left_bound = self.db.node_distance_lower_bound(query, left);
+                let right_bound = self.db.node_distance_lower_bound(query, right);
 
-                if left_dist < right_dist {
+                if left_bound < right_bound {
                     self.traversal(query, left);
                     self.traversal(query, right);
                 } else {
@@ -747,13 +730,10 @@ where
                     self.traversal(query, left);
                 }
             }
-            _ => {
-                let left = 2 * query + 1;
-                let right = left + 1;
-                let left_dist = self.min_node_distance(reference, left);
-                let right_dist = self.min_node_distance(reference, right);
-
-                if left_dist < right_dist {
+            (Some((left, right)), _, _) => {
+                let left_bound = self.db.node_distance_lower_bound(reference, left);
+                let right_bound = self.db.node_distance_lower_bound(reference, right);
+                if left_bound < right_bound {
                     self.traversal(reference, left);
                     self.traversal(reference, right);
                 } else {
@@ -768,12 +748,13 @@ where
         self.bounds.iter_mut().for_each(|v| *v = A::max_value());
     }
 
+    #[inline]
     fn lower_bound(&self, node: usize, parent: usize) -> A {
-        self.bounds[node]
-            + A::from(2).expect("unexpected conversion failure")
-                * (self.db.nodes[parent].radius - self.db.nodes[node].radius)
+        let diff = self.db.radius_of(parent) - self.db.radius_of(node);
+        self.bounds[node] + diff + diff
     }
 
+    #[inline]
     fn bound(&self, parent: usize) -> A {
         let left = 2 * parent + 1;
         let right = left + 1;
@@ -798,21 +779,9 @@ where
             upper
         }
     }
-
-    fn num_points(&self) -> usize {
-        self.db.points.nrows()
-    }
-
-    fn num_nodes(&self) -> usize {
-        self.db.nodes.len()
-    }
-
-    fn idx(&self, i: usize) -> usize {
-        self.db.idx[i]
-    }
 }
 
-// TODO: parallel processing
+// core_distances: distance of center to min_samples' closest point (including the center).
 fn compute_core_distances<'a, A, M>(
     db: &BallTree<'a, A, M>,
     min_samples: usize,
@@ -840,7 +809,7 @@ where
         .chunks_exact(min_samples)
         .enumerate()
         .for_each(|(n, row)| {
-            for val in row.into_iter().skip(1).rev() {
+            for val in row.iter().skip(1).rev() {
                 if core_distances[*val] <= core_distances[n] {
                     candidates.update(n, (n, *val, core_distances[n]));
                 }
