@@ -65,7 +65,7 @@ fn parse() -> (String, usize, usize) {
         return (path, 15, 15);
     }
 
-    if args.len() == 4 && (args[1] == "--params" || args[1] == "-p") {
+    if args.len() == 5 && (args[1] == "--params" || args[1] == "-p") {
         let min_cluster_size: usize = args[2].parse().unwrap_or(15);
         let min_samples: usize = args[3].parse().unwrap_or(15);
         return (path, min_cluster_size, min_samples);
