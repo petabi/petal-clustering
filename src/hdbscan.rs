@@ -46,7 +46,7 @@ where
 
 impl<S, A, M> Fit<ArrayBase<S, Ix2>, (HashMap<usize, Vec<usize>>, Vec<usize>)> for HDbscan<A, M>
 where
-    A: AddAssign + DivAssign + Float + FromPrimitive + Sync + Send + TryFrom<u32> + std::fmt::Debug,
+    A: AddAssign + DivAssign + Float + FromPrimitive + Sync + Send + TryFrom<u32>,
     <A as std::convert::TryFrom<u32>>::Error: Debug,
     S: Data<Elem = A>,
     M: Metric<A> + Clone + Sync + Send,
@@ -558,7 +558,7 @@ where
 #[allow(dead_code)]
 impl<'a, A, M> Boruvka<'a, A, M>
 where
-    A: Float + AddAssign + DivAssign + FromPrimitive + Sync + Send + std::fmt::Debug,
+    A: Float + AddAssign + DivAssign + FromPrimitive + Sync + Send,
     M: Metric<A> + Sync + Send,
 {
     fn new(db: BallTree<'a, A, M>, min_samples: usize) -> Self {
@@ -788,7 +788,7 @@ fn compute_core_distances<'a, A, M>(
     candidates: &mut Candidates<A>,
 ) -> Array1<A>
 where
-    A: AddAssign + DivAssign + FromPrimitive + Float + Sync + Send + std::fmt::Debug,
+    A: AddAssign + DivAssign + FromPrimitive + Float + Sync + Send,
     M: Metric<A> + Sync + Send,
 {
     let mut knn_indices = vec![0; db.points.nrows() * min_samples];
