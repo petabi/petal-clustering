@@ -55,7 +55,9 @@ where
         if input.is_empty() {
             return (HashMap::new(), Vec::new());
         }
+        let input = input.as_standard_layout();
         let db = BallTree::new(input.view(), self.metric.clone()).expect("non-empty array");
+
         let mut mst = if self.boruvka {
             let boruvka = Boruvka::new(db, self.min_samples);
             boruvka.min_spanning_tree().into_raw_vec()
