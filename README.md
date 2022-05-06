@@ -1,6 +1,6 @@
 # petal-clustering
 
-A collection of clustering algorithms. Currently this crate provides DBSCAN and
+A collection of clustering algorithms. Currently this crate provides DBSCAN, HDBSCAN and
 OPTICS.
 
 [![crates.io](https://img.shields.io/crates/v/petal-clustering)](https://crates.io/crates/petal-clustering)
