@@ -91,8 +91,18 @@ where
             }
 
             let cid = clusters.len();
-            let cluster = clusters.entry(cid).or_insert_with(Vec::new);
-            expand_cluster(cluster, &mut visited, idx, self.min_samples, &neighborhoods);
+
+            let mut cluster = Vec::new();
+            expand_cluster(
+                &mut cluster,
+                &mut visited,
+                idx,
+                self.min_samples,
+                &neighborhoods,
+            );
+            if cluster.len() >= self.min_samples {
+                clusters.insert(cid, cluster);
+            }
         }
 
         let in_cluster: HashSet<usize> = clusters.values().flatten().copied().collect();
