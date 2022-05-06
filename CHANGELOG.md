@@ -5,6 +5,12 @@ file is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and
 this project adheres to [Semantic
 Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- Cluster that is smaller than `min_samples` for `Dbscan` should become outliers.
+
 ## [0.5.1] - 2022-05-03
 
 ### Changed
@@ -74,6 +80,7 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 - The [OPTICS](https://en.wikipedia.org/wiki/OPTICS_algorithm) clustering
   algorithm.
 
+[Unreleased]: https://github.com/petabi/petal-clustering/compare/0.5.1...master
 [0.5.1]: https://github.com/petabi/petal-clustering/compare/0.5.0...0.5.1
 [0.5.0]: https://github.com/petabi/petal-clustering/compare/0.4.0...0.5.0
 [0.4.0]: https://github.com/petabi/petal-clustering/compare/0.3.0...0.4.0
