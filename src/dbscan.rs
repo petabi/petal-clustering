@@ -1,4 +1,4 @@
-use ndarray::{Array, ArrayBase, Data, Ix2};
+use ndarray::{ArrayBase, Data, Ix2};
 use num_traits::{Float, FromPrimitive};
 use petal_neighbors::{
     distance::{Euclidean, Metric},
@@ -76,13 +76,9 @@ where
             return (HashMap::new(), Vec::new());
         }
 
-        let neighborhoods = if input.is_standard_layout() {
-            build_neighborhoods(input, self.eps, self.metric.clone())
-        } else {
-            let input = Array::from_shape_vec(input.raw_dim(), input.iter().copied().collect())
-                .expect("valid shape");
-            build_neighborhoods(&input, self.eps, self.metric.clone())
-        };
+        let input = input.as_standard_layout();
+        let neighborhoods = build_neighborhoods(&input, self.eps, self.metric.clone());
+
         let mut visited = vec![false; input.nrows()];
         let mut clusters = HashMap::new();
         for (idx, neighbors) in neighborhoods.iter().enumerate() {
@@ -203,5 +199,31 @@ mod test {
         let (clusters, outliers) = model.fit(&input);
         assert!(clusters.is_empty());
         assert!(outliers.is_empty());
+    }
+
+    #[test]
+    fn fortran_style_input() {
+        let data = array![
+            [1.0, 1.1, 0.9, 1.0, -2.0, -2.2],
+            [2.0, 2.2, 1.9, 2.1, 3.0, 3.1]
+        ];
+        let input = data.reversed_axes();
+        let mut model = Dbscan::new(0.5, 2, Euclidean::default());
+        let (mut clusters, mut outliers) = model.fit(&input);
+        outliers.sort_unstable();
+        for (_, v) in clusters.iter_mut() {
+            v.sort_unstable();
+        }
+
+        let input = input.as_standard_layout();
+        model = Dbscan::new(0.5, 2, Euclidean::default());
+        let (mut std_clusters, mut std_outliers) = model.fit(&input);
+        std_outliers.sort_unstable();
+        for (_, v) in std_clusters.iter_mut() {
+            v.sort_unstable();
+        }
+
+        assert_eq!(std_clusters, clusters);
+        assert_eq!(std_outliers, outliers);
     }
 }
