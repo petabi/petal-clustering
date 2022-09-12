@@ -29,7 +29,7 @@ succinct = "0.5"
 
 [dev-dependencies]
 approx = "0.5"
-criterion = "0.3"
+criterion = "0.4"
 csv = "1.1.6"
 maplit = "1"
 ndarray-rand = "0.14.0"
