@@ -26,7 +26,7 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
-- The [HDBSCAN](https://hdbscan.readthedocs.io/en/latest/how_hdbscan_works.html) clustering algorithm.
+- The [HDBSCAN] clustering algorithm.
 
 ### Changed
 
@@ -94,3 +94,5 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 [0.2.1]: https://github.com/petabi/petal-clustering/compare/0.2.0...0.2.1
 [0.2.0]: https://github.com/petabi/petal-clustering/compare/0.1.0...0.2.0
 [0.1.0]: https://github.com/petabi/petal-clustering/tree/0.1.0
+
+[HDBSCAN]: https://hdbscan.readthedocs.io/en/latest/how_hdbscan_works.html

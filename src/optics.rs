@@ -21,7 +21,7 @@ use super::Fit;
 /// use petal_neighbors::distance::Euclidean;
 /// use petal_clustering::{Optics, Fit};
 ///
-/// let points = array![[1.0, 2.0], [2.0, 5.0], [3.0, 6.0], [8.0, 7.0], [8.0, 8.0], [7.0, 3.0]];
+/// let points = array![[1., 2.], [2., 5.], [3., 6.], [8., 7.], [8., 8.], [7., 3.]];
 /// let clustering = Optics::new(4.5, 2, Euclidean::default()).fit(&points);
 ///
 /// assert_eq!(clustering.0.len(), 2);        // two clusters found

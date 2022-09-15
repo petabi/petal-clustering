@@ -1,7 +1,7 @@
 # petal-clustering
 
-A collection of clustering algorithms. Currently this crate provides DBSCAN, HDBSCAN and
-OPTICS.
+A collection of clustering algorithms. Currently this crate provides DBSCAN,
+HDBSCAN and OPTICS.
 
 [![crates.io](https://img.shields.io/crates/v/petal-clustering)](https://crates.io/crates/petal-clustering)
 [![Documentation](https://docs.rs/petal-clustering/badge.svg)](https://docs.rs/petal-clustering)
@@ -15,13 +15,13 @@ The following example shows how to cluster points using DBSCAN.
 use ndarray::array;
 use petal_clustering::{Dbscan, Fit};
 
-let points = array![[1.0, 2.0], [2.0, 2.0], [2.0, 2.3], [8.0, 7.0], [8.0, 8.0], [25.0, 80.0]];
+let points = array![[1., 2.], [2., 2.], [2., 2.3], [8., 7.], [8., 8.], [25., 80.]];
 let clustering = Dbscan::new(3.0, 2).fit(&points);
 
 assert_eq!(clustering.0.len(), 2);        // two clusters found
 assert_eq!(clustering.0[&0], [0, 1, 2]);  // the first three points in Cluster 0
-assert_eq!(clustering.0[&1], [3, 4]);     // [8.0, 7.0] and [8.0, 8.0] in Cluster 1
-assert_eq!(clustering.1, [5]);            // [25.0, 80.0] doesn't belong to any cluster
+assert_eq!(clustering.0[&1], [3, 4]);     // [8., 7.] and [8., 8.] in Cluster 1
+assert_eq!(clustering.1, [5]);            // [25., 80.] doesn't belong to any cluster
 ```
 
 ## License

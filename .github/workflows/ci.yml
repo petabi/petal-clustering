@@ -15,6 +15,8 @@ jobs:
       run: cargo fmt -- --check
     - name: Clippy
       run: cargo clippy -- -D warnings -W clippy::pedantic
+    - name: markdownlint
+      uses: articulate/actions-markdownlint@v1
 
   test:
     runs-on: ${{ matrix.os }}
@@ -41,5 +43,3 @@ jobs:
     - name: Upload coverage to Codecov
       if: matrix.os == 'ubuntu-latest' && matrix.rust == 'stable'
       uses: codecov/codecov-action@master
-      with:
-        token: ${{secrets.CODECOV_TOKEN}}
