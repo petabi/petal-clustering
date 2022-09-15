@@ -7,6 +7,11 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- Switched to [Rust 2021 Edition](https://doc.rust-lang.org/edition-guide/rust-2021).
+- Requires Rust 1.57 or later.
+
 ### Fixed
 
 - Cluster that is smaller than `min_samples` for `Dbscan` should become outliers.
@@ -86,7 +91,6 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 [0.4.0]: https://github.com/petabi/petal-clustering/compare/0.3.0...0.4.0
 [0.3.0]: https://github.com/petabi/petal-clustering/compare/0.2.3...0.3.0
 [0.2.2]: https://github.com/petabi/petal-clustering/compare/0.2.2...0.2.3
-[0.2.2]: https://github.com/petabi/petal-clustering/compare/0.2.1...0.2.2
 [0.2.1]: https://github.com/petabi/petal-clustering/compare/0.2.0...0.2.1
 [0.2.0]: https://github.com/petabi/petal-clustering/compare/0.1.0...0.2.0
 [0.1.0]: https://github.com/petabi/petal-clustering/tree/0.1.0

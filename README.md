@@ -24,10 +24,6 @@ assert_eq!(clustering.0[&1], [3, 4]);     // [8.0, 7.0] and [8.0, 8.0] in Cluste
 assert_eq!(clustering.1, [5]);            // [25.0, 80.0] doesn't belong to any cluster
 ```
 
-## Minimum Supported Rust Version
-
-This crate is guaranteed to compile on Rust 1.53 and later.
-
 ## License
 
 Copyright 2019-2022 Petabi, Inc.
