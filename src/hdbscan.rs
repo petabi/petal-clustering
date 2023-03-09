@@ -445,7 +445,7 @@ struct TreeUnionFind {
 #[allow(dead_code)]
 impl TreeUnionFind {
     fn new(n: usize) -> Self {
-        let parent = (0..n).into_iter().collect();
+        let parent = (0..n).collect();
         let size = vec![0; n];
         let is_component = BitVector::with_fill(
             u64::try_from(n).expect("fail to build a large enough bit vector"),
@@ -505,7 +505,7 @@ struct UnionFind {
 
 impl UnionFind {
     fn new(n: usize) -> Self {
-        let parent = (0..2 * n).into_iter().collect();
+        let parent = (0..2 * n).collect();
         let size = vec![1]
             .into_iter()
             .cycle()
@@ -784,8 +784,8 @@ where
 }
 
 // core_distances: distance of center to min_samples' closest point (including the center).
-fn compute_core_distances<'a, A, M>(
-    db: &BallTree<'a, A, M>,
+fn compute_core_distances<A, M>(
+    db: &BallTree<A, M>,
     min_samples: usize,
     candidates: &mut Candidates<A>,
 ) -> Array1<A>
@@ -884,7 +884,7 @@ struct Components {
 impl Components {
     fn new(m: usize, n: usize) -> Self {
         // each point started as its own component.
-        let point = (0..n).into_iter().collect();
+        let point = (0..n).collect();
         // the component of the node is concluded when
         // all the enclosed points are in the same component
         let node = vec![u32::MAX; m];
@@ -1042,7 +1042,7 @@ mod test {
         assert_eq!(vec![0, 4], uf.components());
 
         uf = super::TreeUnionFind::new(3);
-        assert_eq!((0..3).into_iter().collect::<Vec<_>>(), uf.parent);
+        assert_eq!((0..3).collect::<Vec<_>>(), uf.parent);
         assert_eq!(vec![0; 3], uf.size);
     }
 
