@@ -2,19 +2,22 @@
 name = "petal-clustering"
 version = "0.5.1"
 edition = "2021"
-rust-version = "1.57"
+rust-version = "1.60"
 description = "A collection of clustering algorithms."
 readme = "README.md"
 documentation = "https://docs.rs/petal-clustering"
 homepage = "https://github.com/petabi/petal-clustering"
 repository = "https://github.com/petabi/petal-clustering"
 license = "Apache-2.0"
-keywords = ["clustering", "dbscan", "optics", "unsupervised", "machine-learning"]
-categories = ["algorithms", "data-structures"]
-authors = [
-    "Min Kim <msk@dolbo.net>",
-    "Min Shao <min.shao1988@gmail.com>"
+keywords = [
+  "clustering",
+  "dbscan",
+  "optics",
+  "unsupervised",
+  "machine-learning",
 ]
+categories = ["algorithms", "data-structures"]
+authors = ["Min Kim <msk@dolbo.net>", "Min Shao <min.shao1988@gmail.com>"]
 exclude = ["./github"]
 
 [badges]
@@ -25,7 +28,7 @@ ndarray = "0.15"
 num-traits = "0.2"
 petal-neighbors = "0.8.0"
 rayon = "1"
-serde = { version = "1",  features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
 succinct = "0.5"
 
 [dev-dependencies]

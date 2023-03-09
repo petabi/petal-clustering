@@ -10,7 +10,7 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 ### Changed
 
 - Switched to [Rust 2021 Edition](https://doc.rust-lang.org/edition-guide/rust-2021).
-- Requires Rust 1.57 or later.
+- Requires Rust 1.60 or later.
 
 ### Fixed
 
