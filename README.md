@@ -26,7 +26,7 @@ assert_eq!(clustering.1, [5]);            // [25., 80.] doesn't belong to any cl
 
 ## License
 
-Copyright 2019-2022 Petabi, Inc.
+Copyright 2019-2023 Petabi, Inc.
 
 Licensed under [Apache License, Version 2.0][apache-license] (the "License");
 you may not use this crate except in compliance with the License.
