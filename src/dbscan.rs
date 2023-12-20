@@ -1,5 +1,5 @@
 use ndarray::{ArrayBase, Data, Ix2};
-use num_traits::{Float, FromPrimitive};
+use num_traits::{float::FloatCore, FromPrimitive};
 use petal_neighbors::{
     distance::{Euclidean, Metric},
     BallTree,
@@ -41,7 +41,7 @@ pub struct Dbscan<A, M> {
 
 impl<A> Default for Dbscan<A, Euclidean>
 where
-    A: Float,
+    A: FloatCore,
 {
     #[must_use]
     fn default() -> Self {
@@ -66,7 +66,7 @@ impl<A, M> Dbscan<A, M> {
 
 impl<S, A, M> Fit<ArrayBase<S, Ix2>, (HashMap<usize, Vec<usize>>, Vec<usize>)> for Dbscan<A, M>
 where
-    A: AddAssign + DivAssign + Float + FromPrimitive + Sync,
+    A: AddAssign + DivAssign + FloatCore + FromPrimitive + Sync,
     S: Data<Elem = A>,
     M: Metric<A> + Clone + Sync,
 {
@@ -112,7 +112,7 @@ where
 
 fn build_neighborhoods<S, A, M>(input: &ArrayBase<S, Ix2>, eps: A, metric: M) -> Vec<Vec<usize>>
 where
-    A: AddAssign + DivAssign + Float + FromPrimitive + Sync,
+    A: AddAssign + DivAssign + FloatCore + FromPrimitive + Sync,
     S: Data<Elem = A>,
     M: Metric<A> + Sync,
 {

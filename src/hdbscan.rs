@@ -1,5 +1,5 @@
 use ndarray::{Array1, ArrayBase, ArrayView1, ArrayView2, Data, Ix2};
-use num_traits::{Float, FromPrimitive};
+use num_traits::{float::FloatCore, FromPrimitive};
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
@@ -29,7 +29,7 @@ pub struct HDbscan<A, M> {
 
 impl<A> Default for HDbscan<A, Euclidean>
 where
-    A: Float,
+    A: FloatCore,
 {
     #[must_use]
     fn default() -> Self {
@@ -46,7 +46,7 @@ where
 
 impl<S, A, M> Fit<ArrayBase<S, Ix2>, (HashMap<usize, Vec<usize>>, Vec<usize>)> for HDbscan<A, M>
 where
-    A: AddAssign + DivAssign + Float + FromPrimitive + Sync + Send + TryFrom<u32>,
+    A: AddAssign + DivAssign + FloatCore + FromPrimitive + Sync + Send + TryFrom<u32>,
     <A as std::convert::TryFrom<u32>>::Error: Debug,
     S: Data<Elem = A>,
     M: Metric<A> + Clone + Sync + Send,
@@ -92,7 +92,7 @@ where
     }
 }
 
-fn mst_linkage<A: Float>(
+fn mst_linkage<A: FloatCore>(
     input: ArrayView2<A>,
     metric: &dyn Metric<A>,
     core_distances: ArrayView1<A>,
@@ -176,7 +176,7 @@ fn mst_linkage<A: Float>(
     unsafe { mst.assume_init() }
 }
 
-fn label<A: Float>(mst: Array1<(usize, usize, A)>) -> Array1<(usize, usize, A, usize)> {
+fn label<A: FloatCore>(mst: Array1<(usize, usize, A)>) -> Array1<(usize, usize, A, usize)> {
     let n = mst.len() + 1;
     let mut uf = UnionFind::new(n);
     mst.into_iter()
@@ -188,7 +188,7 @@ fn label<A: Float>(mst: Array1<(usize, usize, A)>) -> Array1<(usize, usize, A, u
         .collect()
 }
 
-fn condense_mst<A: Float + Div>(
+fn condense_mst<A: FloatCore + Div>(
     mst: ArrayView1<(usize, usize, A, usize)>,
     min_cluster_size: usize,
 ) -> Vec<(usize, usize, A, usize)> {
@@ -275,7 +275,7 @@ fn condense_mst<A: Float + Div>(
     result
 }
 
-fn get_stability<A: Float + AddAssign + Sub + TryFrom<u32>>(
+fn get_stability<A: FloatCore + AddAssign + Sub + TryFrom<u32>>(
     condensed_tree: &ArrayView1<(usize, usize, A, usize)>,
 ) -> HashMap<usize, A>
 where
@@ -310,7 +310,7 @@ where
     )
 }
 
-fn find_clusters<A: Float + AddAssign + Sub + TryFrom<u32>>(
+fn find_clusters<A: FloatCore + AddAssign + Sub + TryFrom<u32>>(
     condensed_tree: &ArrayView1<(usize, usize, A, usize)>,
 ) -> (HashMap<usize, Vec<usize>>, Vec<usize>)
 where
@@ -411,7 +411,7 @@ fn bfs_tree(tree: &[(usize, usize)], root: usize) -> Vec<usize> {
     result
 }
 
-fn bfs_mst<A: Float>(mst: ArrayView1<(usize, usize, A, usize)>, start: usize) -> Vec<usize> {
+fn bfs_mst<A: FloatCore>(mst: ArrayView1<(usize, usize, A, usize)>, start: usize) -> Vec<usize> {
     let n = mst.len() + 1;
 
     let mut to_process = vec![start];
@@ -545,7 +545,7 @@ impl UnionFind {
 #[allow(dead_code)]
 struct Boruvka<'a, A, M>
 where
-    A: Float,
+    A: FloatCore,
     M: Metric<A>,
 {
     db: BallTree<'a, A, M>,
@@ -560,7 +560,7 @@ where
 #[allow(dead_code)]
 impl<'a, A, M> Boruvka<'a, A, M>
 where
-    A: Float + AddAssign + DivAssign + FromPrimitive + Sync + Send,
+    A: FloatCore + AddAssign + DivAssign + FromPrimitive + Sync + Send,
     M: Metric<A> + Sync + Send,
 {
     fn new(db: BallTree<'a, A, M>, min_samples: usize) -> Self {
@@ -789,7 +789,7 @@ fn compute_core_distances<A, M>(
     candidates: &mut Candidates<A>,
 ) -> Array1<A>
 where
-    A: AddAssign + DivAssign + FromPrimitive + Float + Sync + Send,
+    A: AddAssign + DivAssign + FromPrimitive + FloatCore + Sync + Send,
     M: Metric<A> + Sync + Send,
 {
     let mut knn_indices = vec![0; db.points.nrows() * min_samples];
@@ -828,7 +828,7 @@ struct Candidates<A> {
 }
 
 #[allow(dead_code)]
-impl<A: Float> Candidates<A> {
+impl<A: FloatCore> Candidates<A> {
     fn new(n: usize) -> Self {
         // define max_value as NULL
         let neighbors = vec![u32::max_value(); n];

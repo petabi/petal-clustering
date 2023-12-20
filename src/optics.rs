@@ -1,5 +1,5 @@
 use ndarray::{Array, ArrayBase, Data, Ix2};
-use num_traits::{Float, FromPrimitive};
+use num_traits::{float::FloatCore, FromPrimitive};
 use petal_neighbors::{
     distance::{Euclidean, Metric},
     BallTree,
@@ -46,7 +46,7 @@ pub struct Optics<A, M> {
 
 impl<A> Default for Optics<A, Euclidean>
 where
-    A: Float,
+    A: FloatCore,
 {
     #[must_use]
     fn default() -> Self {
@@ -63,7 +63,7 @@ where
 
 impl<A, M> Optics<A, M>
 where
-    A: Float,
+    A: FloatCore,
     M: Metric<A>,
 {
     #[must_use]
@@ -111,7 +111,7 @@ where
 
 impl<S, A, M> Fit<ArrayBase<S, Ix2>, (HashMap<usize, Vec<usize>>, Vec<usize>)> for Optics<A, M>
 where
-    A: AddAssign + DivAssign + Float + FromPrimitive + Send + Sync,
+    A: AddAssign + DivAssign + FloatCore + FromPrimitive + Send + Sync,
     S: Data<Elem = A> + Sync,
     M: Metric<A> + Clone + Sync,
 {
@@ -160,7 +160,7 @@ fn process<S, A, M>(
     reacheability: &mut [A],
     visited: &mut [bool],
 ) where
-    A: Float,
+    A: FloatCore,
     S: Data<Elem = A>,
     M: Metric<A>,
 {
@@ -216,7 +216,7 @@ fn update<S, A, M>(
     seeds: &mut Vec<usize>,
     reacheability: &mut [A],
 ) where
-    A: Float,
+    A: FloatCore,
     S: Data<Elem = A>,
     M: Metric<A>,
 {
@@ -252,7 +252,7 @@ fn build_neighborhoods<S, A, M>(
     metric: M,
 ) -> Vec<Neighborhood<A>>
 where
-    A: AddAssign + DivAssign + Float + FromPrimitive + Send + Sync,
+    A: AddAssign + DivAssign + FloatCore + FromPrimitive + Send + Sync,
     S: Data<Elem = A>,
     M: Metric<A> + Sync,
 {
@@ -285,7 +285,7 @@ fn reacheability_distance<S, A, M>(
     metric: &M,
 ) -> A
 where
-    A: Float,
+    A: FloatCore,
     S: Data<Elem = A>,
     M: Metric<A>,
 {
