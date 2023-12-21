@@ -91,9 +91,9 @@ where
                 if clusters.is_empty() {
                     outliers.push(id);
                 } else {
-                    let v = clusters
-                        .get_mut(&(clusters.len() - 1))
-                        .expect("cluster map crashed");
+                    let Some(v) = clusters.get_mut(&(clusters.len() - 1)) else {
+                        unreachable!("`clusters` is not empty and its key is a sequence number");
+                    };
                     v.push(id);
                 }
             } else {
