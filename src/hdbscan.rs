@@ -593,9 +593,8 @@ where
     fn update_components(&mut self) -> usize {
         let components = self.components.get_current();
         for i in components {
-            let (src, sink, dist) = match self.candidates.get(i) {
-                Some((src, sink, dist)) => (src, sink, dist),
-                None => continue,
+            let Some((src, sink, dist)) = self.candidates.get(i) else {
+                continue;
             };
 
             if self.components.add(src, sink).is_none() {
