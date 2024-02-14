@@ -735,11 +735,11 @@ where
                 let left_bound = self.db.node_distance_lower_bound(reference, left);
                 let right_bound = self.db.node_distance_lower_bound(reference, right);
                 if left_bound < right_bound {
-                    self.traversal(reference, left);
-                    self.traversal(reference, right);
+                    self.traversal(left, reference);
+                    self.traversal(right, reference);
                 } else {
-                    self.traversal(reference, right);
-                    self.traversal(reference, left);
+                    self.traversal(right, reference);
+                    self.traversal(left, reference);
                 }
             }
         }
