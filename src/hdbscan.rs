@@ -1,18 +1,19 @@
-use ndarray::{Array1, ArrayBase, ArrayView1, ArrayView2, Data, Ix2};
-use num_traits::{float::FloatCore, FromPrimitive};
-use rayon::prelude::*;
-use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::convert::TryFrom;
 use std::fmt::Debug;
 use std::mem::MaybeUninit;
 use std::ops::{AddAssign, Div, DivAssign, Sub};
+
+use ndarray::{Array1, ArrayBase, ArrayView1, ArrayView2, Data, Ix2};
+use num_traits::{float::FloatCore, FromPrimitive};
+use petal_neighbors::distance::{Euclidean, Metric};
+use petal_neighbors::BallTree;
+use rayon::prelude::*;
+use serde::{Deserialize, Serialize};
 use succinct::{BitVecMut, BitVector};
 
 use super::Fit;
-use petal_neighbors::distance::{Euclidean, Metric};
-use petal_neighbors::BallTree;
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct HDbscan<A, M> {
@@ -920,9 +921,10 @@ mod test {
 
     #[test]
     fn hdbscan() {
-        use crate::Fit;
         use ndarray::array;
         use petal_neighbors::distance::Euclidean;
+
+        use crate::Fit;
 
         let data = array![
             [1.0, 2.0],
@@ -1147,8 +1149,9 @@ mod test {
 
     #[test]
     fn get_stability() {
-        use ndarray::arr1;
         use std::collections::HashMap;
+
+        use ndarray::arr1;
 
         let condensed = arr1(&[
             (7, 6, 1. / 9., 1),

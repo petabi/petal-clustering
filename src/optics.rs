@@ -1,3 +1,6 @@
+use std::collections::HashMap;
+use std::ops::{AddAssign, DivAssign};
+
 use ndarray::{Array, ArrayBase, Data, Ix2};
 use num_traits::{float::FloatCore, FromPrimitive};
 use petal_neighbors::{
@@ -6,8 +9,6 @@ use petal_neighbors::{
 };
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::ops::{AddAssign, DivAssign};
 
 use super::Fit;
 
@@ -299,9 +300,10 @@ where
 
 #[cfg(test)]
 mod test {
-    use super::*;
     use maplit::hashmap;
     use ndarray::{array, aview2};
+
+    use super::*;
 
     #[test]
     fn default() {
