@@ -831,9 +831,9 @@ struct Candidates<A> {
 impl<A: FloatCore> Candidates<A> {
     fn new(n: usize) -> Self {
         // define max_value as NULL
-        let neighbors = vec![u32::max_value(); n];
+        let neighbors = vec![u32::MAX; n];
         // define max_value as NULL
-        let points = vec![u32::max_value(); n];
+        let points = vec![u32::MAX; n];
         // define max_value as infinite far
         let distances = vec![A::max_value(); n];
         Self {
@@ -862,13 +862,13 @@ impl<A: FloatCore> Candidates<A> {
     }
 
     fn reset(&mut self, i: usize) {
-        self.points[i] = u32::max_value();
-        self.neighbors[i] = u32::max_value();
+        self.points[i] = u32::MAX;
+        self.neighbors[i] = u32::MAX;
         self.distances[i] = A::max_value();
     }
 
     fn is_undefined(&self, i: usize) -> bool {
-        self.points[i] == u32::max_value() || self.neighbors[i] == u32::max_value()
+        self.points[i] == u32::MAX || self.neighbors[i] == u32::MAX
     }
 }
 
