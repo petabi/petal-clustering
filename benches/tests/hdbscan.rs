@@ -1,8 +1,9 @@
-use super::setup::{make_blobs, CenterConfig};
 use criterion::{black_box, Criterion};
 use ndarray::{arr2, ArrayView};
 use ndarray_rand::rand::{rngs::StdRng, Rng, SeedableRng};
 use petal_clustering::{Fit, HDbscan};
+
+use super::setup::{make_blobs, CenterConfig};
 
 pub fn build(c: &mut Criterion) {
     let n = black_box(5000);
