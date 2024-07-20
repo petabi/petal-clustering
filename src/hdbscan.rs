@@ -45,16 +45,20 @@ where
     }
 }
 
-impl<S, A, M> Fit<ArrayBase<S, Ix2>, (HashMap<usize, Vec<usize>>, Vec<usize>)> for HDbscan<A, M>
+impl<S, A, M> Fit<ArrayBase<S, Ix2>, (HashMap<usize, Vec<usize>>, Vec<usize>, Vec<A>)>
+    for HDbscan<A, M>
 where
-    A: AddAssign + DivAssign + FloatCore + FromPrimitive + Sync + Send + TryFrom<u32>,
+    A: Debug + AddAssign + DivAssign + FloatCore + FromPrimitive + Sync + Send + TryFrom<u32>,
     <A as std::convert::TryFrom<u32>>::Error: Debug,
     S: Data<Elem = A>,
     M: Metric<A> + Clone + Sync + Send,
 {
-    fn fit(&mut self, input: &ArrayBase<S, Ix2>) -> (HashMap<usize, Vec<usize>>, Vec<usize>) {
+    fn fit(
+        &mut self,
+        input: &ArrayBase<S, Ix2>,
+    ) -> (HashMap<usize, Vec<usize>>, Vec<usize>, Vec<A>) {
         if input.is_empty() {
-            return (HashMap::new(), Vec::new());
+            return (HashMap::new(), Vec::new(), Vec::new());
         }
         let input = input.as_standard_layout();
         let db = BallTree::new(input.view(), self.metric.clone()).expect("non-empty array");
@@ -88,8 +92,10 @@ where
         mst.sort_unstable_by(|a, b| a.2.partial_cmp(&(b.2)).expect("invalid distance"));
         let sorted_mst = Array1::from_vec(mst);
         let labeled = label(sorted_mst);
-        let condensed = Array1::from_vec(condense_mst(labeled.view(), self.min_cluster_size));
-        find_clusters(&condensed.view())
+        let condensed = condense_mst(labeled.view(), self.min_cluster_size);
+        let outlier_scores = glosh(&condensed, self.min_cluster_size);
+        let (clusters, outliers) = find_clusters(&Array1::from_vec(condensed).view());
+        (clusters, outliers, outlier_scores)
     }
 }
 
@@ -390,6 +396,88 @@ where
         }
     }
     (res_clusters, outliers)
+}
+
+// Based on: https://github.com/scikit-learn-contrib/hdbscan/blob/98928d0c095715edc9584e7989bd8559673bc2f0/hdbscan/_hdbscan_tree.pyx#L530
+pub fn glosh<A: FloatCore + AddAssign + Sub + TryFrom<u32>>(
+    condensed_mst: &[(usize, usize, A, usize)],
+    min_cluster_size: usize,
+) -> Vec<A>
+where
+    <A as TryFrom<u32>>::Error: Debug,
+{
+    let child_array = condensed_mst
+        .iter()
+        .map(|(parent, child, lambda, _)| (*child, *parent, *lambda))
+        .collect::<Vec<(usize, usize, A)>>();
+
+    let deaths = max_lambdas(condensed_mst, min_cluster_size);
+
+    let root_cluster = condensed_mst
+        .iter()
+        .min_by_key(|(parent, _, _, _)| *parent)
+        .unwrap()
+        .0;
+
+    let mut scores = vec![A::zero(); root_cluster];
+    for (child, parent, lambda) in child_array {
+        if child >= root_cluster {
+            continue;
+        }
+        let lambda_max = deaths[parent];
+        if lambda_max == A::zero() {
+            scores[child] = A::zero();
+        } else {
+            scores[child] = (lambda_max - lambda) / lambda_max;
+        }
+    }
+    scores
+}
+
+// Based on: https://github.com/scikit-learn-contrib/hdbscan/blob/98928d0c095715edc9584e7989bd8559673bc2f0/hdbscan/_hdbscan_tree.pyx#L259
+// However, the paper contradicts the implementation of Python HDBSCAN, so this function follows the paper instead.
+fn max_lambdas<A: FloatCore + AddAssign + Sub + TryFrom<u32>>(
+    condensed_mst: &[(usize, usize, A, usize)],
+    min_cluster_size: usize,
+) -> Vec<A>
+where
+    <A as TryFrom<u32>>::Error: Debug,
+{
+    let largest_parent = condensed_mst
+        .iter()
+        .max_by_key(|(parent, _, _, _)| *parent)
+        .unwrap()
+        .0;
+    let mut sorted_parent_data = condensed_mst
+        .iter()
+        .map(|(parent, child, lambda, count)| (*child, *parent, *lambda, *count))
+        .collect::<Vec<(usize, usize, A, usize)>>();
+    sorted_parent_data.sort_by_key(|(child, _, _, _)| *child);
+
+    let mut deaths_arr: Vec<A> = vec![A::zero(); largest_parent + 1];
+    let mut counts = vec![0; largest_parent + 1];
+
+    for (child, parent, lambda, count) in sorted_parent_data.clone() {
+        counts[parent] += count;
+        if counts[parent] >= min_cluster_size {
+            deaths_arr[parent] = deaths_arr[parent].max(lambda).max(deaths_arr[child]);
+        }
+    }
+
+    let mut sorted_parent_data = condensed_mst
+        .iter()
+        .map(|(parent, child, lambda, count)| (*parent, *child, *lambda, *count))
+        .collect::<Vec<(usize, usize, A, usize)>>();
+    sorted_parent_data.sort_by_key(|(parent, _, _, _)| *parent);
+    sorted_parent_data.reverse();
+
+    for (parent, child, lambda, _) in sorted_parent_data.clone() {
+        if counts[parent] >= min_cluster_size {
+            deaths_arr[parent] = deaths_arr[parent].max(lambda).max(deaths_arr[child]);
+        }
+    }
+
+    deaths_arr
 }
 
 fn bfs_tree(tree: &[(usize, usize)], root: usize) -> Vec<usize> {
@@ -942,7 +1030,7 @@ mod test {
             metric: Euclidean::default(),
             boruvka: false,
         };
-        let (clusters, outliers) = hdbscan.fit(&data);
+        let (clusters, outliers, _) = hdbscan.fit(&data);
         assert_eq!(clusters.len(), 2);
         assert_eq!(
             outliers.len(),
