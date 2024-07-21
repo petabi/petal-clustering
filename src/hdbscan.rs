@@ -398,7 +398,23 @@ where
     (res_clusters, outliers)
 }
 
-// Based on: https://github.com/scikit-learn-contrib/hdbscan/blob/98928d0c095715edc9584e7989bd8559673bc2f0/hdbscan/_hdbscan_tree.pyx#L530
+// GLOSH: Global-Local Outlier Score from Hierarchies
+// Reference: https://dl.acm.org/doi/10.1145/2733381
+//
+// To compute the outlier score of a data object x:
+// 1. Find the first cluster C that x gets attached to in the hierarchy:
+//    eps_x = the eps that x belongs to C.
+// 2. Find the lowest eps C:
+//    eps_C = the lowest eps that C or any of C's child clusters survives w.r.t. min_cluster_size.
+// 3. The outlier score of x is defined as:
+//    score(x) = (eps_x - eps_C) / eps_x
+//
+//   *here, we are dealing with density threshold lambda instead of eps (lambda = 1/eps):
+//    eps_x = the lambda that x belongs to C.
+//    eps_C = the highest lambda that C or any of C's child clusters survives w.r.t. min_cluster_size.
+//
+//
+
 pub fn glosh<A: FloatCore + AddAssign + Sub + TryFrom<u32>>(
     condensed_mst: &[(usize, usize, A, usize)],
     min_cluster_size: usize,
@@ -406,36 +422,29 @@ pub fn glosh<A: FloatCore + AddAssign + Sub + TryFrom<u32>>(
 where
     <A as TryFrom<u32>>::Error: Debug,
 {
-    let child_array = condensed_mst
-        .iter()
-        .map(|(parent, child, lambda, _)| (*child, *parent, *lambda))
-        .collect::<Vec<(usize, usize, A)>>();
-
     let deaths = max_lambdas(condensed_mst, min_cluster_size);
-
-    let root_cluster = condensed_mst
+    let num_events = condensed_mst
         .iter()
         .min_by_key(|(parent, _, _, _)| *parent)
         .unwrap()
         .0;
 
-    let mut scores = vec![A::zero(); root_cluster];
-    for (child, parent, lambda) in child_array {
-        if child >= root_cluster {
+    let mut scores = vec![A::zero(); num_events];
+    for (parent, child, lambda, _) in condensed_mst {
+        if *child >= num_events {
             continue;
         }
-        let lambda_max = deaths[parent];
+        let lambda_max = deaths[*parent];
         if lambda_max == A::zero() {
-            scores[child] = A::zero();
+            scores[*child] = A::zero();
         } else {
-            scores[child] = (lambda_max - lambda) / lambda_max;
+            scores[*child] = (lambda_max - *lambda) / lambda_max;
         }
     }
     scores
 }
 
-// Based on: https://github.com/scikit-learn-contrib/hdbscan/blob/98928d0c095715edc9584e7989bd8559673bc2f0/hdbscan/_hdbscan_tree.pyx#L259
-// However, the paper contradicts the implementation of Python HDBSCAN, so this function follows the paper instead.
+// Return the maximum lambda value for each cluster
 fn max_lambdas<A: FloatCore + AddAssign + Sub + TryFrom<u32>>(
     condensed_mst: &[(usize, usize, A, usize)],
     min_cluster_size: usize,
@@ -448,35 +457,20 @@ where
         .max_by_key(|(parent, _, _, _)| *parent)
         .unwrap()
         .0;
-    let mut sorted_parent_data = condensed_mst
-        .iter()
-        .map(|(parent, child, lambda, count)| (*child, *parent, *lambda, *count))
-        .collect::<Vec<(usize, usize, A, usize)>>();
-    sorted_parent_data.sort_by_key(|(child, _, _, _)| *child);
-
+    // parent, child, lambda, size
     let mut deaths_arr: Vec<A> = vec![A::zero(); largest_parent + 1];
-    let mut counts = vec![0; largest_parent + 1];
-
-    for (child, parent, lambda, count) in sorted_parent_data.clone() {
-        counts[parent] += count;
-        if counts[parent] >= min_cluster_size {
-            deaths_arr[parent] = deaths_arr[parent].max(lambda).max(deaths_arr[child]);
+    let mut parent_sizes: Vec<usize> = vec![0; largest_parent + 1];
+    for (parent, _, lambda, child_size) in condensed_mst {
+        parent_sizes[*parent] += *child_size;
+        if *child_size >= min_cluster_size {
+            deaths_arr[*parent] = deaths_arr[*parent].max(*lambda);
         }
     }
-
-    let mut sorted_parent_data = condensed_mst
-        .iter()
-        .map(|(parent, child, lambda, count)| (*parent, *child, *lambda, *count))
-        .collect::<Vec<(usize, usize, A, usize)>>();
-    sorted_parent_data.sort_by_key(|(parent, _, _, _)| *parent);
-    sorted_parent_data.reverse();
-
-    for (parent, child, lambda, _) in sorted_parent_data.clone() {
-        if counts[parent] >= min_cluster_size {
-            deaths_arr[parent] = deaths_arr[parent].max(lambda).max(deaths_arr[child]);
+    for (parent, child, lambda, _) in condensed_mst.iter().rev() {
+        if parent_sizes[*parent] >= min_cluster_size {
+            deaths_arr[*parent] = deaths_arr[*parent].max(*lambda).max(deaths_arr[*child]);
         }
     }
-
     deaths_arr
 }
 
