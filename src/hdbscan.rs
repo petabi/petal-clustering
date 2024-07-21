@@ -400,6 +400,7 @@ where
 
 // GLOSH: Global-Local Outlier Score from Hierarchies
 // Reference: https://dl.acm.org/doi/10.1145/2733381
+// Equation (8) from the paper.
 //
 // To compute the outlier score of a data object x:
 // 1. Find the first cluster C that x gets attached to in the hierarchy:
@@ -407,14 +408,12 @@ where
 // 2. Find the lowest eps C:
 //    eps_C = the lowest eps that C or any of C's child clusters survives w.r.t. min_cluster_size.
 // 3. The outlier score of x is defined as:
-//    score(x) = (eps_x - eps_C) / eps_x
+//    score(x) = 1 - eps_C / eps_x
 //
 //   *here, we are dealing with density threshold lambda instead of eps (lambda = 1/eps):
-//    eps_x = the lambda that x belongs to C.
-//    eps_C = the highest lambda that C or any of C's child clusters survives w.r.t. min_cluster_size.
-//
-//
-
+//    lambda_x = the lambda that x belongs to C.
+//    lambda_C = the highest lambda that C or any of C's child clusters survives w.r.t. min_cluster_size.
+//    score(x) = 1 - lambda_x / lambda_C
 pub fn glosh<A: FloatCore + AddAssign + Sub + TryFrom<u32>>(
     condensed_mst: &[(usize, usize, A, usize)],
     min_cluster_size: usize,
@@ -444,7 +443,8 @@ where
     scores
 }
 
-// Return the maximum lambda value for each cluster
+// Return the maximum lambda value (min eps) for each cluster C such that
+// the cluster or any of its child clusters has at least min_cluster_size points.
 fn max_lambdas<A: FloatCore + AddAssign + Sub + TryFrom<u32>>(
     condensed_mst: &[(usize, usize, A, usize)],
     min_cluster_size: usize,
@@ -457,18 +457,18 @@ where
         .max_by_key(|(parent, _, _, _)| *parent)
         .unwrap()
         .0;
-    // parent, child, lambda, size
-    let mut deaths_arr: Vec<A> = vec![A::zero(); largest_parent + 1];
+
+    // bottom-up traverse the hierarchy to keep track of the maximum lambda values
+    // (same with the reverse order iteration on the condensed_mst)
     let mut parent_sizes: Vec<usize> = vec![0; largest_parent + 1];
-    for (parent, _, lambda, child_size) in condensed_mst {
+    let mut deaths_arr: Vec<A> = vec![A::zero(); largest_parent + 1];
+    for (parent, child, lambda, child_size) in condensed_mst.iter().rev() {
         parent_sizes[*parent] += *child_size;
-        if *child_size >= min_cluster_size {
+        if parent_sizes[*parent] >= min_cluster_size {
             deaths_arr[*parent] = deaths_arr[*parent].max(*lambda);
         }
-    }
-    for (parent, child, lambda, _) in condensed_mst.iter().rev() {
-        if parent_sizes[*parent] >= min_cluster_size {
-            deaths_arr[*parent] = deaths_arr[*parent].max(*lambda).max(deaths_arr[*child]);
+        if *child_size >= min_cluster_size {
+            deaths_arr[*parent] = deaths_arr[*parent].max(deaths_arr[*child]);
         }
     }
     deaths_arr
