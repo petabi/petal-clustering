@@ -1015,19 +1015,21 @@ mod test {
             [2.0, 1.0],
             [2.0, 2.0],
             // cluster2:
-            [3.0, 3.0],
-            [3.0, 4.0],
-            [4.0, 3.0],
-            [4.0, 4.0],
+            [4.0, 1.0],
+            [4.0, 2.0],
+            [5.0, 1.0],
+            [5.0, 2.0],
             // cluster3:
-            [7.0, 7.0],
-            [7.0, 8.0],
-            [8.0, 7.0],
-            [8.0, 8.0],
+            [9.0, 1.0],
+            [9.0, 2.0],
+            [10.0, 1.0],
+            [10.0, 2.0],
+            [11.0, 1.0],
+            [11.0, 2.0],
             // outlier1:
-            [5.0, 5.0],
+            [2.0, 5.0],
             // outlier2:
-            [8.0, 1.0],
+            [10.0, 8.0],
         ];
         let mut hdbscan = super::HDbscan {
             eps: 0.5,
@@ -1039,27 +1041,27 @@ mod test {
         };
         let (_, _, outlier_scores) = hdbscan.fit(&data);
 
-        // The first 12 data objects immediately form their clusters at eps = √2
+        // The first 14 data objects immediately form their clusters at eps = √2
         // The outlier scores of these objects are all 0:
         //      glosh(x) = 1 - √2 / √2 = 0
-        for i in 0..12 {
+        for i in 0..14 {
             assert_eq!(outlier_scores[i], 0.0);
         }
 
         // Outlier1 joins the cluster C = {cluster1 ∪ cluster2} at:
-        //      eps_outlier1 = √5
+        //      eps_outlier1 = √13
         // The lowest eps that C or any of its child clusters survives w.r.t. min_cluster_size = 4 is:
         //      eps_C = √2 (due to cluster1 or cluster2)
         // Then the outlier score of outlier1 is:
-        //      glosh(outlier1) =  1 - √2 / √5
-        assert_eq!(outlier_scores[12], 1.0 - 2.0_f64.sqrt() / 5.0_f64.sqrt());
+        //      glosh(outlier1) =  1 - √2 / √13 = 0.60776772972
+        assert_eq!(outlier_scores[14], 1.0 - 2.0_f64.sqrt() / 13.0_f64.sqrt());
 
-        // Outlier2 joins the root cluster at at eps = 5
+        // Outlier2 joins the root cluster at at eps = √37
         // The lowest eps that the root cluster survives w.r.t. min_cluster_size = 4 is:
         //      eps_root = √2
         // Then the outlier score of outlier2 is:
-        //      glosh(outlier2) =  1 - √2 / 5
-        assert_eq!(outlier_scores[13], 1.0 - 2.0_f64.sqrt() / 5.0);
+        //      glosh(outlier2) =  1 - √2 / √37 = 0.76750472251
+        assert_eq!(outlier_scores[15], 1.0 - 2.0_f64.sqrt() / 37.0_f64.sqrt());
     }
 
     #[test]
