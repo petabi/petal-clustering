@@ -1002,6 +1002,67 @@ impl Components {
 mod test {
 
     #[test]
+    fn glosh() {
+        use ndarray::array;
+        use petal_neighbors::distance::Euclidean;
+
+        use crate::Fit;
+
+        let data = array![
+            // cluster1:
+            [1.0, 1.0],
+            [1.0, 2.0],
+            [2.0, 1.0],
+            [2.0, 2.0],
+            // cluster2:
+            [3.0, 3.0],
+            [3.0, 4.0],
+            [4.0, 3.0],
+            [4.0, 4.0],
+            // cluster3:
+            [7.0, 7.0],
+            [7.0, 8.0],
+            [8.0, 7.0],
+            [8.0, 8.0],
+            // outlier1:
+            [5.0, 5.0],
+            // outlier2:
+            [8.0, 1.0],
+        ];
+        let mut hdbscan = super::HDbscan {
+            eps: 0.5,
+            alpha: 1.,
+            min_samples: 4,
+            min_cluster_size: 4,
+            metric: Euclidean::default(),
+            boruvka: false,
+        };
+        let (_, _, outlier_scores) = hdbscan.fit(&data);
+
+        // The first 12 data objects immediately form their clusters at eps = √2
+        // The outlier scores of these points are all 0:
+        //      eps_x = 1 - √2 / √2 = 0
+        for i in 0..12 {
+            assert_eq!(outlier_scores[i], 0.0);
+        }
+
+        // Outlier1 joins the cluster C = {cluster1 ∪ cluster2} at:
+        //      eps_outlier1 = √5
+        // The lower eps that C or any of its child clusters survives w.r.t. min_cluster_size = 4 is:
+        //      eps_C = √2 (due to cluster1 or cluster2)
+        // Then the outlier score of outlier1 is:
+        // glosh(outlier1) =  1 - √2 / √5
+        assert_eq!(outlier_scores[12], 1.0 - 2.0_f64.sqrt() / 5.0_f64.sqrt());
+
+        // Outlier2 joins the root cluster at at eps = 5
+        // The lower eps that the root cluster survives w.r.t. min_cluster_size = 4 is:
+        //      eps_root = √2
+        // Then the outlier score of outlier2 is:
+        // glosh(outlier2) =  1 - √2 / 5
+        assert_eq!(outlier_scores[13], 1.0 - 2.0_f64.sqrt() / 5.0);
+    }
+
+    #[test]
     fn hdbscan() {
         use ndarray::array;
         use petal_neighbors::distance::Euclidean;
