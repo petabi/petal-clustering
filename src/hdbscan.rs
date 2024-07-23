@@ -411,10 +411,10 @@ where
 //    score(x) = 1 - eps_C / eps_x
 //
 //   *here, we are dealing with density threshold lambda instead of eps (lambda = 1/eps):
-//    lambda_x = the lambda that x belongs to C.
-//    lambda_C = the highest lambda that C or any of C's child clusters survives w.r.t. min_cluster_size.
+//    lambda_x = 1 / eps_x (the highest lambda that x belongs to C)
+//    lambda_C = 1 / eps_C (the highest lambda that C or any of C's child clusters survives w.r.t. min_cluster_size)
 //    score(x) = 1 - lambda_x / lambda_C
-pub fn glosh<A: FloatCore + AddAssign + Sub + TryFrom<u32>>(
+fn glosh<A: FloatCore + AddAssign + Sub + TryFrom<u32>>(
     condensed_mst: &[(usize, usize, A, usize)],
     min_cluster_size: usize,
 ) -> Vec<A>
