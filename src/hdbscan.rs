@@ -45,16 +45,20 @@ where
     }
 }
 
-impl<S, A, M> Fit<ArrayBase<S, Ix2>, (HashMap<usize, Vec<usize>>, Vec<usize>)> for HDbscan<A, M>
+impl<S, A, M> Fit<ArrayBase<S, Ix2>, (HashMap<usize, Vec<usize>>, Vec<usize>, Vec<A>)>
+    for HDbscan<A, M>
 where
     A: AddAssign + DivAssign + FloatCore + FromPrimitive + Sync + Send + TryFrom<u32>,
     <A as std::convert::TryFrom<u32>>::Error: Debug,
     S: Data<Elem = A>,
     M: Metric<A> + Clone + Sync + Send,
 {
-    fn fit(&mut self, input: &ArrayBase<S, Ix2>) -> (HashMap<usize, Vec<usize>>, Vec<usize>) {
+    fn fit(
+        &mut self,
+        input: &ArrayBase<S, Ix2>,
+    ) -> (HashMap<usize, Vec<usize>>, Vec<usize>, Vec<A>) {
         if input.is_empty() {
-            return (HashMap::new(), Vec::new());
+            return (HashMap::new(), Vec::new(), Vec::new());
         }
         let input = input.as_standard_layout();
         let db = BallTree::new(input.view(), self.metric.clone()).expect("non-empty array");
@@ -88,8 +92,10 @@ where
         mst.sort_unstable_by(|a, b| a.2.partial_cmp(&(b.2)).expect("invalid distance"));
         let sorted_mst = Array1::from_vec(mst);
         let labeled = label(sorted_mst);
-        let condensed = Array1::from_vec(condense_mst(labeled.view(), self.min_cluster_size));
-        find_clusters(&condensed.view())
+        let condensed = condense_mst(labeled.view(), self.min_cluster_size);
+        let outlier_scores = glosh(&condensed, self.min_cluster_size);
+        let (clusters, outliers) = find_clusters(&Array1::from_vec(condensed).view());
+        (clusters, outliers, outlier_scores)
     }
 }
 
@@ -390,6 +396,82 @@ where
         }
     }
     (res_clusters, outliers)
+}
+
+// GLOSH: Global-Local Outlier Score from Hierarchies
+// Reference: https://dl.acm.org/doi/10.1145/2733381
+// Equation (8) from the paper.
+//
+// To compute the outlier score of a data object x:
+// 1. Find the first cluster C that x gets attached to in the hierarchy:
+//    eps_x = the eps that x belongs to C.
+// 2. Find the lowest eps C:
+//    eps_C = the lowest eps that C or any of C's child clusters survives w.r.t. min_cluster_size.
+// 3. The outlier score of x is defined as:
+//    score(x) = 1 - eps_C / eps_x
+//
+//   *here, we are dealing with density threshold lambda instead of eps (lambda = 1/eps):
+//    lambda_x = 1 / eps_x (the highest lambda that x belongs to C)
+//    lambda_C = 1 / eps_C (the highest lambda that C or any of C's child clusters survives w.r.t. min_cluster_size)
+//    score(x) = 1 - lambda_x / lambda_C
+fn glosh<A: FloatCore + AddAssign + Sub + TryFrom<u32>>(
+    condensed_mst: &[(usize, usize, A, usize)],
+    min_cluster_size: usize,
+) -> Vec<A>
+where
+    <A as TryFrom<u32>>::Error: Debug,
+{
+    let deaths = max_lambdas(condensed_mst, min_cluster_size);
+    let num_events = condensed_mst
+        .iter()
+        .min_by_key(|(parent, _, _, _)| *parent)
+        .unwrap()
+        .0;
+
+    let mut scores = vec![A::zero(); num_events];
+    for (parent, child, lambda, _) in condensed_mst {
+        if *child >= num_events {
+            continue;
+        }
+        let lambda_max = deaths[*parent];
+        if lambda_max == A::zero() {
+            scores[*child] = A::zero();
+        } else {
+            scores[*child] = (lambda_max - *lambda) / lambda_max;
+        }
+    }
+    scores
+}
+
+// Return the maximum lambda value (min eps) for each cluster C such that
+// the cluster or any of its child clusters has at least min_cluster_size points.
+fn max_lambdas<A: FloatCore + AddAssign + Sub + TryFrom<u32>>(
+    condensed_mst: &[(usize, usize, A, usize)],
+    min_cluster_size: usize,
+) -> Vec<A>
+where
+    <A as TryFrom<u32>>::Error: Debug,
+{
+    let largest_parent = condensed_mst
+        .iter()
+        .max_by_key(|(parent, _, _, _)| *parent)
+        .unwrap()
+        .0;
+
+    // bottom-up traverse the hierarchy to keep track of the maximum lambda values
+    // (same with the reverse order iteration on the condensed_mst)
+    let mut parent_sizes: Vec<usize> = vec![0; largest_parent + 1];
+    let mut deaths_arr: Vec<A> = vec![A::zero(); largest_parent + 1];
+    for (parent, child, lambda, child_size) in condensed_mst.iter().rev() {
+        parent_sizes[*parent] += *child_size;
+        if parent_sizes[*parent] >= min_cluster_size {
+            deaths_arr[*parent] = deaths_arr[*parent].max(*lambda);
+        }
+        if *child_size >= min_cluster_size {
+            deaths_arr[*parent] = deaths_arr[*parent].max(deaths_arr[*child]);
+        }
+    }
+    deaths_arr
 }
 
 fn bfs_tree(tree: &[(usize, usize)], root: usize) -> Vec<usize> {
@@ -920,6 +1002,69 @@ impl Components {
 mod test {
 
     #[test]
+    fn glosh() {
+        use ndarray::array;
+        use petal_neighbors::distance::Euclidean;
+
+        use crate::Fit;
+
+        let data = array![
+            // cluster1:
+            [1.0, 1.0],
+            [1.0, 2.0],
+            [2.0, 1.0],
+            [2.0, 2.0],
+            // cluster2:
+            [4.0, 1.0],
+            [4.0, 2.0],
+            [5.0, 1.0],
+            [5.0, 2.0],
+            // cluster3:
+            [9.0, 1.0],
+            [9.0, 2.0],
+            [10.0, 1.0],
+            [10.0, 2.0],
+            [11.0, 1.0],
+            [11.0, 2.0],
+            // outlier1:
+            [2.0, 5.0],
+            // outlier2:
+            [10.0, 8.0],
+        ];
+        let mut hdbscan = super::HDbscan {
+            eps: 0.5,
+            alpha: 1.,
+            min_samples: 4,
+            min_cluster_size: 4,
+            metric: Euclidean::default(),
+            boruvka: false,
+        };
+        let (_, _, outlier_scores) = hdbscan.fit(&data);
+
+        // The first 14 data objects immediately form their clusters at eps = √2
+        // The outlier scores of these objects are all 0:
+        //      glosh(x) = 1 - √2 / √2 = 0
+        for i in 0..14 {
+            assert_eq!(outlier_scores[i], 0.0);
+        }
+
+        // Outlier1 joins the cluster C = {cluster1 ∪ cluster2} at:
+        //      eps_outlier1 = √13
+        // The lowest eps that C or any of its child clusters survives w.r.t. min_cluster_size = 4 is:
+        //      eps_C = √2 (due to cluster1 or cluster2)
+        // Then the outlier score of outlier1 is:
+        //      glosh(outlier1) =  1 - √2 / √13 = 0.60776772972
+        assert_eq!(outlier_scores[14], 1.0 - 2.0_f64.sqrt() / 13.0_f64.sqrt());
+
+        // Outlier2 joins the root cluster at at eps = √37
+        // The lowest eps that the root cluster survives w.r.t. min_cluster_size = 4 is:
+        //      eps_root = √2
+        // Then the outlier score of outlier2 is:
+        //      glosh(outlier2) =  1 - √2 / √37 = 0.76750472251
+        assert_eq!(outlier_scores[15], 1.0 - 2.0_f64.sqrt() / 37.0_f64.sqrt());
+    }
+
+    #[test]
     fn hdbscan() {
         use ndarray::array;
         use petal_neighbors::distance::Euclidean;
@@ -942,7 +1087,7 @@ mod test {
             metric: Euclidean::default(),
             boruvka: false,
         };
-        let (clusters, outliers) = hdbscan.fit(&data);
+        let (clusters, outliers, _) = hdbscan.fit(&data);
         assert_eq!(clusters.len(), 2);
         assert_eq!(
             outliers.len(),
