@@ -5,7 +5,7 @@ file is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and
 this project adheres to [Semantic
 Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.9.0] - 2024-08-09
 
 ### Changed
 
@@ -111,7 +111,7 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 - The [OPTICS](https://en.wikipedia.org/wiki/OPTICS_algorithm) clustering
   algorithm.
 
-[Unreleased]: https://github.com/petabi/petal-clustering/compare/0.8.0...main
+[0.9.0]: https://github.com/petabi/petal-clustering/compare/0.8.0...0.9.0
 [0.8.0]: https://github.com/petabi/petal-clustering/compare/0.7.0...0.8.0
 [0.7.0]: https://github.com/petabi/petal-clustering/compare/0.6.0...0.7.0
 [0.6.0]: https://github.com/petabi/petal-clustering/compare/0.5.1...0.6.0
