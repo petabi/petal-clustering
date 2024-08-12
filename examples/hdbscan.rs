@@ -39,9 +39,9 @@ fn main() {
         min_samples,
         min_cluster_size,
         metric: Euclidean::default(),
-        boruvka: true,
+        boruvka: false,
     };
-    let (clusters, outliers) = clustering.fit(&data.view());
+    let (clusters, outliers, _outlier_scores) = clustering.fit(&data.view());
     println!("========= Report =========");
     println!("# of events processed: {}", data.nrows());
     println!("# of features provided: {}", data.ncols());
