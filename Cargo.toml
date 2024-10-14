@@ -1,6 +1,6 @@
 [package]
 name = "petal-clustering"
-version = "0.8.0"
+version = "0.9.0"
 edition = "2021"
 rust-version = "1.74"
 description = "A collection of clustering algorithms."
@@ -24,9 +24,9 @@ exclude = ["./github"]
 codecov = { repository = "petabi/petal-clustering", service = "github" }
 
 [dependencies]
-ndarray = "0.15"
+ndarray = "0.16"
 num-traits = "0.2"
-petal-neighbors = "0.10.0"
+petal-neighbors = "0.11.0"
 rayon = "1"
 serde = { version = "1", features = ["derive"] }
 succinct = "0.5"
@@ -36,7 +36,7 @@ approx = "0.5"
 criterion = "0.5"
 csv = "1.1.6"
 maplit = "1"
-ndarray-rand = "0.14.0"
+ndarray-rand = "0.15.0"
 
 [[bench]]
 name = "main"

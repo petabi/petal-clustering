@@ -121,7 +121,7 @@ where
         return Vec::new();
     }
     let rows: Vec<_> = input.rows().into_iter().collect();
-    let db = BallTree::new(input.view(), metric).expect("non-empty array");
+    let db = BallTree::new(input, metric).expect("non-empty array");
     rows.into_par_iter()
         .map(|p| db.query_radius(&p, eps).into_iter().collect::<Vec<usize>>())
         .collect()

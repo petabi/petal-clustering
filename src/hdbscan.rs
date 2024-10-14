@@ -63,9 +63,9 @@ where
         let input = input.as_standard_layout();
         let db = BallTree::new(input.view(), self.metric.clone()).expect("non-empty array");
 
-        let mut mst = if self.boruvka {
+        let (mut mst, _offset) = if self.boruvka {
             let boruvka = Boruvka::new(db, self.min_samples);
-            boruvka.min_spanning_tree().into_raw_vec()
+            boruvka.min_spanning_tree().into_raw_vec_and_offset()
         } else {
             let core_distances = Array1::from_vec(
                 input
@@ -86,7 +86,7 @@ where
                 core_distances.view(),
                 self.alpha,
             )
-            .into_raw_vec()
+            .into_raw_vec_and_offset()
         };
 
         mst.sort_unstable_by(|a, b| a.2.partial_cmp(&(b.2)).expect("invalid distance"));
