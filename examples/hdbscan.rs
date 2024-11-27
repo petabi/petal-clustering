@@ -15,7 +15,7 @@ fn main() {
     let data: Vec<f64> = rdr
         .deserialize()
         .map(|v| {
-            let r: Vec<f64> = v.expect("corruptted data");
+            let r: Vec<f64> = v.expect("corrupted data");
             if nfeatures < 1 {
                 nfeatures = r.len();
             }
@@ -39,7 +39,7 @@ fn main() {
         min_samples,
         min_cluster_size,
         metric: Euclidean::default(),
-        boruvka: false,
+        boruvka: true,
     };
     let (clusters, outliers, _outlier_scores) = clustering.fit(&data.view());
     println!("========= Report =========");
