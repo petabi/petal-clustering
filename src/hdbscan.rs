@@ -417,16 +417,16 @@ fn find_clusters<A: FloatCore + FromPrimitive + AddAssign + Sub>(
 //    lambda_x = 1 / eps_x
 //    lambda_A = 1 / eps_C
 //    score(x) = 1 - lambda_x / lambda_C
-fn glosh<A: FloatCore + FromPrimitive + AddAssign + Sub>(
+fn glosh<A: FloatCore>(
     condensed_mst: &[(usize, usize, A, usize)],
     min_cluster_size: usize,
 ) -> Vec<A> {
     let deaths = max_lambdas(condensed_mst, min_cluster_size);
     let num_events = condensed_mst
         .iter()
-        .min_by_key(|(parent, _, _, _)| *parent)
-        .unwrap()
-        .0;
+        .map(|(_, child, _, _)| *child)
+        .max()
+        .map_or(0, |max_child| max_child + 1);
 
     let mut scores = vec![A::zero(); num_events];
     for (parent, child, lambda, _) in condensed_mst {
@@ -445,7 +445,7 @@ fn glosh<A: FloatCore + FromPrimitive + AddAssign + Sub>(
 
 // Return the maximum lambda value (min eps) for each cluster C such that
 // the cluster or any of its child clusters has at least min_cluster_size points.
-fn max_lambdas<A: FloatCore + FromPrimitive + AddAssign + Sub>(
+fn max_lambdas<A: FloatCore>(
     condensed_mst: &[(usize, usize, A, usize)],
     min_cluster_size: usize,
 ) -> Vec<A> {
