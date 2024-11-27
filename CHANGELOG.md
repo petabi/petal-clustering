@@ -5,6 +5,13 @@ file is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and
 this project adheres to [Semantic
 Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0] - 2024-11-01
+
+### Changed
+
+- `HDbscan` now accepts `f32`, in addion to `f64`, as the element type of the
+  input matrix.
+
 ## [0.9.0] - 2024-08-09
 
 ### Changed
@@ -111,6 +118,7 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 - The [OPTICS](https://en.wikipedia.org/wiki/OPTICS_algorithm) clustering
   algorithm.
 
+[0.10.0]: https://github.com/petabi/petal-clustering/compare/0.9.0...0.10.0
 [0.9.0]: https://github.com/petabi/petal-clustering/compare/0.8.0...0.9.0
 [0.8.0]: https://github.com/petabi/petal-clustering/compare/0.7.0...0.8.0
 [0.7.0]: https://github.com/petabi/petal-clustering/compare/0.6.0...0.7.0

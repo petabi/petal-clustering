@@ -48,8 +48,7 @@ where
 impl<S, A, M> Fit<ArrayBase<S, Ix2>, (HashMap<usize, Vec<usize>>, Vec<usize>, Vec<A>)>
     for HDbscan<A, M>
 where
-    A: AddAssign + DivAssign + FloatCore + FromPrimitive + Sync + Send + TryFrom<u32>,
-    <A as std::convert::TryFrom<u32>>::Error: Debug,
+    A: AddAssign + DivAssign + FloatCore + FromPrimitive + Sync + Send,
     S: Data<Elem = A>,
     M: Metric<A> + Clone + Sync + Send,
 {
@@ -282,12 +281,9 @@ fn condense_mst<A: FloatCore + Div>(
     result
 }
 
-fn get_stability<A: FloatCore + AddAssign + Sub + TryFrom<u32>>(
+fn get_stability<A: FloatCore + FromPrimitive + AddAssign + Sub>(
     condensed_tree: &ArrayView1<(usize, usize, A, usize)>,
-) -> HashMap<usize, A>
-where
-    <A as TryFrom<u32>>::Error: Debug,
-{
+) -> HashMap<usize, A> {
     let mut births: HashMap<_, _> = condensed_tree.iter().fold(HashMap::new(), |mut births, v| {
         let entry = births.entry(v.1).or_insert(v.2);
         if *entry > v.2 {
@@ -310,19 +306,18 @@ where
         |mut stability, (parent, _child, lambda, size)| {
             let entry = stability.entry(*parent).or_insert_with(A::zero);
             let birth = births.get(parent).expect("invalid child node.");
-            *entry += (*lambda - *birth)
-                * A::try_from(u32::try_from(*size).expect("out of bound")).expect("out of bound");
+            let Some(size) = A::from_usize(*size) else {
+                panic!("invalid size");
+            };
+            *entry += (*lambda - *birth) * size;
             stability
         },
     )
 }
 
-fn find_clusters<A: FloatCore + AddAssign + Sub + TryFrom<u32>>(
+fn find_clusters<A: FloatCore + FromPrimitive + AddAssign + Sub>(
     condensed_tree: &ArrayView1<(usize, usize, A, usize)>,
-) -> (HashMap<usize, Vec<usize>>, Vec<usize>)
-where
-    <A as TryFrom<u32>>::Error: Debug,
-{
+) -> (HashMap<usize, Vec<usize>>, Vec<usize>) {
     let mut stability = get_stability(condensed_tree);
     let mut nodes: Vec<_> = stability.keys().copied().collect();
     nodes.sort_unstable();
@@ -1000,6 +995,36 @@ impl Components {
 }
 
 mod test {
+    #[test]
+    fn hdbscan32() {
+        use ndarray::{array, Array2};
+        use petal_neighbors::distance::Euclidean;
+
+        use crate::Fit;
+
+        let data: Array2<f32> = array![
+            [1.0, 2.0],
+            [1.1, 2.2],
+            [0.9, 1.9],
+            [1.0, 2.1],
+            [-2.0, 3.0],
+            [-2.2, 3.1],
+        ];
+        let mut hdbscan = super::HDbscan {
+            eps: 0.5,
+            alpha: 1.,
+            min_samples: 2,
+            min_cluster_size: 2,
+            metric: Euclidean::default(),
+            boruvka: false,
+        };
+        let (clusters, outliers) = hdbscan.fit(&data);
+        assert_eq!(clusters.len(), 2);
+        assert_eq!(
+            outliers.len(),
+            data.nrows() - clusters.values().fold(0, |acc, v| acc + v.len())
+        );
+    }
 
     #[test]
     fn glosh() {
@@ -1065,13 +1090,13 @@ mod test {
     }
 
     #[test]
-    fn hdbscan() {
-        use ndarray::array;
+    fn hdbscan64() {
+        use ndarray::{array, Array2};
         use petal_neighbors::distance::Euclidean;
 
         use crate::Fit;
 
-        let data = array![
+        let data: Array2<f64> = array![
             [1.0, 2.0],
             [1.1, 2.2],
             [0.9, 1.9],
