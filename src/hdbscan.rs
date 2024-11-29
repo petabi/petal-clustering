@@ -15,6 +15,39 @@ use succinct::{BitVecMut, BitVector};
 
 use super::Fit;
 
+/// HDBSCAN (hierarchical density-based spatial clustering of applications with noise)
+/// clustering algorithm.
+///
+/// # Examples
+///
+/// ```
+/// use ndarray::array;
+/// use petal_neighbors::distance::Euclidean;
+/// use petal_clustering::{HDbscan, Fit};
+///
+/// let points = array![
+///             [1.0, 2.0],
+///             [1.1, 2.2],
+///             [0.9, 1.9],
+///             [1.0, 2.1],
+///             [-2.0, 3.0],
+///             [-2.2, 3.1],
+///         ];
+/// let mut hdbscan = HDbscan {
+///    eps: 0.5,
+///    alpha: 1.,
+///    min_samples: 2,
+///    min_cluster_size: 2,
+///    metric: Euclidean::default(),
+///    boruvka: false,
+/// };
+/// let (clusters, outliers, _outlier_scores) = hdbscan.fit(&points);
+/// assert_eq!(clusters.len(), 2);   // two clusters found
+///
+/// assert_eq!(
+///     outliers.len(),
+///     points.nrows() - clusters.values().fold(0, |acc, v| acc + v.len()));
+/// ```
 #[derive(Debug, Deserialize, Serialize)]
 pub struct HDbscan<A, M> {
     /// The radius of a neighborhood.
