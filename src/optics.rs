@@ -41,7 +41,7 @@ pub struct Optics<A, M> {
     pub metric: M,
 
     ordered: Vec<usize>,
-    reacheability: Vec<A>,
+    reachability: Vec<A>,
     neighborhoods: Vec<Neighborhood<A>>,
 }
 
@@ -56,7 +56,7 @@ where
             min_samples: 5,
             metric: Euclidean::default(),
             ordered: vec![],
-            reacheability: vec![],
+            reachability: vec![],
             neighborhoods: vec![],
         }
     }
@@ -74,7 +74,7 @@ where
             min_samples,
             metric,
             ordered: vec![],
-            reacheability: vec![],
+            reachability: vec![],
             neighborhoods: vec![],
         }
     }
@@ -88,7 +88,7 @@ where
         let mut clusters: HashMap<usize, Vec<usize>> = HashMap::new();
 
         for &id in &self.ordered {
-            if self.reacheability[id].is_normal() && self.reacheability[id] <= eps {
+            if self.reachability[id].is_normal() && self.reachability[id] <= eps {
                 if clusters.is_empty() {
                     outliers.push(id);
                 } else {
@@ -130,7 +130,7 @@ where
         };
         let mut visited = vec![false; input.nrows()];
         self.ordered = Vec::with_capacity(input.nrows());
-        self.reacheability = vec![A::nan(); input.nrows()];
+        self.reachability = vec![A::nan(); input.nrows()];
         for (idx, n) in self.neighborhoods.iter().enumerate() {
             if visited[idx] || n.neighbors.len() < self.min_samples {
                 continue;
@@ -142,7 +142,7 @@ where
                 &self.metric,
                 &self.neighborhoods,
                 &mut self.ordered,
-                &mut self.reacheability,
+                &mut self.reachability,
                 &mut visited,
             );
         }
@@ -158,7 +158,7 @@ fn process<S, A, M>(
     metric: &M,
     neighborhoods: &[Neighborhood<A>],
     ordered: &mut Vec<usize>,
-    reacheability: &mut [A],
+    reachability: &mut [A],
     visited: &mut [bool],
 ) where
     A: FloatCore,
@@ -183,7 +183,7 @@ fn process<S, A, M>(
             visited,
             metric,
             &mut seeds,
-            reacheability,
+            reachability,
         );
         while let Some(s) = seeds.pop() {
             if visited[s] {
@@ -202,7 +202,7 @@ fn process<S, A, M>(
                 visited,
                 metric,
                 &mut seeds,
-                reacheability,
+                reachability,
             );
         }
     }
@@ -215,7 +215,7 @@ fn update<S, A, M>(
     visited: &[bool],
     metric: &M,
     seeds: &mut Vec<usize>,
-    reacheability: &mut [A],
+    reachability: &mut [A],
 ) where
     A: FloatCore,
     S: Data<Elem = A>,
@@ -225,17 +225,17 @@ fn update<S, A, M>(
         if visited[o] {
             continue;
         }
-        let reachdist = reacheability_distance(o, id, input, neighborhood, metric);
-        if !reacheability[o].is_normal() {
-            reacheability[o] = reachdist;
+        let reachdist = reachability_distance(o, id, input, neighborhood, metric);
+        if !reachability[o].is_normal() {
+            reachability[o] = reachdist;
             seeds.push(o);
-        } else if reacheability[o].lt(&reachdist) {
-            reacheability[o] = reachdist;
+        } else if reachability[o].lt(&reachdist) {
+            reachability[o] = reachdist;
         }
     }
     seeds.sort_unstable_by(|a, b| {
-        reacheability[*a]
-            .partial_cmp(&reacheability[*b])
+        reachability[*a]
+            .partial_cmp(&reachability[*b])
             .unwrap()
             .reverse()
     });
@@ -278,7 +278,7 @@ where
         .collect()
 }
 
-fn reacheability_distance<S, A, M>(
+fn reachability_distance<S, A, M>(
     o: usize,
     p: usize,
     input: &ArrayBase<S, Ix2>,
