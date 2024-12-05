@@ -52,8 +52,8 @@ fn main() {
     );
     println!("# of noise events: {}", noise_events.len());
     println!(
-        "# of outliers (prob > 0.9): {}",
-        outlier_scores.iter().filter(|&&score| score > 0.9).count()
+        "# of outliers (prob > 0.8): {}",
+        outlier_scores.iter().filter(|&&score| score > 0.8).count()
     );
 }
 

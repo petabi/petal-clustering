@@ -455,11 +455,13 @@ fn glosh<A: FloatCore>(
     min_cluster_size: usize,
 ) -> Vec<A> {
     let deaths = max_lambdas(condensed_mst, min_cluster_size);
+
+    // min_parent gives the number of events in the hierarchy
     let num_events = condensed_mst
         .iter()
-        .map(|(_, child, _, _)| *child)
-        .max()
-        .map_or(0, |max_child| max_child + 1);
+        .map(|(parent, _, _, _)| *parent)
+        .min()
+        .map_or(0, |min_parent| min_parent);
 
     let mut scores = vec![A::zero(); num_events];
     for (parent, child, lambda, _) in condensed_mst {
