@@ -366,7 +366,7 @@ fn find_clusters<A: FloatCore + FromPrimitive + AddAssign + Sub>(
     for node in nodes {
         let subtree_stability = tree.iter().fold(A::zero(), |acc, (p, c)| {
             if *p == node {
-                acc + *stability.get(c).expect("corruptted stability dictionary")
+                acc + *stability.get(c).expect("corrupted stability dictionary")
             } else {
                 acc
             }
@@ -448,8 +448,8 @@ fn find_clusters<A: FloatCore + FromPrimitive + AddAssign + Sub>(
 //
 // Since we are working with density lambda values (where lambda = 1/eps):
 //    lambda_x = 1 / eps_x
-//    lambda_A = 1 / eps_C
-//    score(x) = 1 - lambda_x / lambda_C
+//    lambda_A = 1 / eps_A
+//    score(x) = 1 - lambda_x / lambda_A
 fn glosh<A: FloatCore>(
     condensed_mst: &[(usize, usize, A, usize)],
     min_cluster_size: usize,
@@ -482,16 +482,16 @@ fn max_lambdas<A: FloatCore>(
     condensed_mst: &[(usize, usize, A, usize)],
     min_cluster_size: usize,
 ) -> Vec<A> {
-    let largest_parent = condensed_mst
+    let largest_cluster_id = condensed_mst
         .iter()
-        .max_by_key(|(parent, _, _, _)| *parent)
-        .unwrap()
-        .0;
+        .map(|(parent, child, _, _)| parent.max(child))
+        .max()
+        .expect("empty condensed_mst");
 
     // bottom-up traverse the hierarchy to keep track of the maximum lambda values
     // (same with the reverse order iteration on the condensed_mst)
-    let mut parent_sizes: Vec<usize> = vec![0; largest_parent + 1];
-    let mut deaths_arr: Vec<A> = vec![A::zero(); largest_parent + 1];
+    let mut parent_sizes: Vec<usize> = vec![0; largest_cluster_id + 1];
+    let mut deaths_arr: Vec<A> = vec![A::zero(); largest_cluster_id + 1];
     for (parent, child, lambda, child_size) in condensed_mst.iter().rev() {
         parent_sizes[*parent] += *child_size;
         if parent_sizes[*parent] >= min_cluster_size {

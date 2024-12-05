@@ -41,7 +41,7 @@ fn main() {
         metric: Euclidean::default(),
         boruvka: true,
     };
-    let (clusters, outliers, _outlier_scores) = clustering.fit(&data.view());
+    let (clusters, noise_events, outlier_scores) = clustering.fit(&data.view());
     println!("========= Report =========");
     println!("# of events processed: {}", data.nrows());
     println!("# of features provided: {}", data.ncols());
@@ -50,7 +50,11 @@ fn main() {
         "# of events clustered: {}",
         clusters.values().map(|v| v.len()).sum::<usize>(),
     );
-    println!("# of outliers: {}", outliers.len());
+    println!("# of noise events: {}", noise_events.len());
+    println!(
+        "# of outliers (prob > 0.9): {}",
+        outlier_scores.iter().filter(|&&score| score > 0.9).count()
+    );
 }
 
 fn parse() -> (String, usize, usize) {
