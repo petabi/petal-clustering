@@ -34,7 +34,6 @@ fn main() {
     let nevents = data.len() / nfeatures;
     let data = Array2::from_shape_vec((nevents, nfeatures), data).expect("data shape error");
     let mut clustering = HDbscan {
-        eps: 0.5,
         alpha: 1.,
         min_samples,
         min_cluster_size,
