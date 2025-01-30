@@ -15,6 +15,18 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 [GLOSH]: https://dl.acm.org/doi/10.1145/2733381
 
+### Removed
+
+- The dummy parameter HDbscan::eps has been removed as it was *NOT* being used
+  in the current implementation, and the removal will *NOT* affect the
+  clustering result. The current cluster selection method follows the "eom"
+  (excess of mass) approach. This assumes an equivalent setting to
+  cluster_selection_eps=0.0 and cluster_selection_method="eom" in
+  [Scikit-learn]'s HDBSCAN implementation. Removing this unused parameter helps
+  clarify the clustering behavior and avoids confusion.
+
+[Scikit-learn]: https://scikit-learn.org/stable/modules/generated/sklearn.cluster.HDBSCAN.html#sklearn.cluster.HDBSCAN
+
 ## [0.10.0] - 2024-11-01
 
 ### Changed

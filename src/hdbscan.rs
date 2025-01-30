@@ -34,7 +34,6 @@ use super::Fit;
 ///             [-2.2, 3.1],
 ///         ];
 /// let mut hdbscan = HDbscan {
-///    eps: 0.5,
 ///    alpha: 1.,
 ///    min_samples: 2,
 ///    min_cluster_size: 2,
@@ -51,7 +50,6 @@ use super::Fit;
 #[derive(Debug, Deserialize, Serialize)]
 pub struct HDbscan<A, M> {
     /// The radius of a neighborhood.
-    pub eps: A,
     pub alpha: A,
 
     /// The minimum number of points required to form a dense region.
@@ -68,7 +66,6 @@ where
     #[must_use]
     fn default() -> Self {
         Self {
-            eps: A::from(0.5_f32).expect("valid float"),
             alpha: A::one(),
             min_samples: 15,
             min_cluster_size: 15,
@@ -1048,7 +1045,6 @@ mod test {
             [-2.2, 3.1],
         ];
         let mut hdbscan = super::HDbscan {
-            eps: 0.5,
             alpha: 1.,
             min_samples: 2,
             min_cluster_size: 2,
@@ -1079,7 +1075,6 @@ mod test {
             [-2.2, 3.1],
         ];
         let mut hdbscan = super::HDbscan {
-            eps: 0.5,
             alpha: 1.,
             min_samples: 2,
             min_cluster_size: 2,
@@ -1194,7 +1189,6 @@ mod test {
             [10.0, 8.0],
         ];
         let mut hdbscan = super::HDbscan {
-            eps: 0.5,
             alpha: 1.,
             min_samples: 4,
             min_cluster_size: 4,
