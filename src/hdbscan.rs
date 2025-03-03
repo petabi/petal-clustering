@@ -142,10 +142,15 @@ fn mst_linkage<A: FloatCore>(
         "dimensions of distance_metric and core_distances should match"
     );
 
-    assert!(
-        nrows >= 2,
-        "dimensions of distance_metric and core_distances should be greater than 1"
-    );
+    if nrows == 0 {
+        // If there are no input points, return an empty MST.
+        return Array1::from_vec(vec![]);
+    }
+
+    if nrows == 1 {
+        // If there is only one input point, return a single edge with zero distance.
+        return Array1::from_vec(vec![(0, 0, A::zero())]);
+    }
 
     let mut mst = Array1::<(usize, usize, A)>::uninit(nrows - 1);
     let mut in_tree: Vec<bool> = vec![false; nrows];

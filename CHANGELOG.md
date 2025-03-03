@@ -12,6 +12,7 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 - `HDbscan::fit` now returns an additional `Vec` that contains the score of
   each outlier. The score is computed from the [GLOSH] (Global-Local Outlier
   Score from Hierarchies) algorithm.
+- Modified `mst_linkage` function to handle cases where nrows is 0 or 1.
 
 [GLOSH]: https://dl.acm.org/doi/10.1145/2733381
 
