@@ -1,6 +1,8 @@
 mod dbscan;
 mod hdbscan;
+mod mst;
 mod optics;
+mod union_find;
 
 pub use dbscan::Dbscan;
 pub use hdbscan::HDbscan;
