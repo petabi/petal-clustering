@@ -40,7 +40,7 @@ fn main() {
         metric: Euclidean::default(),
         boruvka: true,
     };
-    let (clusters, noise_events, outlier_scores) = clustering.fit(&data.view());
+    let (clusters, noise_events, outlier_scores) = clustering.fit(&data.view(), None);
     println!("========= Report =========");
     println!("# of events processed: {}", data.nrows());
     println!("# of features provided: {}", data.ncols());

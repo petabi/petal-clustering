@@ -40,7 +40,7 @@ use super::Fit;
 ///    metric: Euclidean::default(),
 ///    boruvka: false,
 /// };
-/// let (clusters, outliers, _outlier_scores) = hdbscan.fit(&points);
+/// let (clusters, outliers, _outlier_scores) = hdbscan.fit(&points, None);
 /// assert_eq!(clusters.len(), 2);   // two clusters found
 ///
 /// assert_eq!(
@@ -85,6 +85,7 @@ where
     fn fit(
         &mut self,
         input: &ArrayBase<S, Ix2>,
+        _: Option<(HashMap<usize, Vec<usize>>, Vec<usize>, Vec<A>)>,
     ) -> (HashMap<usize, Vec<usize>>, Vec<usize>, Vec<A>) {
         if input.is_empty() {
             return (HashMap::new(), Vec::new(), Vec::new());
@@ -1056,7 +1057,7 @@ mod test {
             metric: Euclidean::default(),
             boruvka: false,
         };
-        let (clusters, outliers, _) = hdbscan.fit(&data);
+        let (clusters, outliers, _) = hdbscan.fit(&data, None);
         assert_eq!(clusters.len(), 2);
         assert_eq!(
             outliers.len(),
@@ -1086,7 +1087,7 @@ mod test {
             metric: Euclidean::default(),
             boruvka: false,
         };
-        let (clusters, outliers, _) = hdbscan.fit(&data);
+        let (clusters, outliers, _) = hdbscan.fit(&data, None);
         assert_eq!(clusters.len(), 2);
         assert_eq!(
             outliers.len(),
@@ -1200,7 +1201,7 @@ mod test {
             metric: Euclidean::default(),
             boruvka: false,
         };
-        let (_, _, outlier_scores) = hdbscan.fit(&data);
+        let (_, _, outlier_scores) = hdbscan.fit(&data, None);
 
         // The first 14 data objects immediately form their clusters at eps = √2
         // The outlier scores of these objects are all 0:

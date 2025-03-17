@@ -11,7 +11,7 @@ pub trait Fit<I, O>
 where
     I: ?Sized,
 {
-    fn fit(&mut self, input: &I) -> O;
+    fn fit(&mut self, input: &I, partial_labels: Option<O>) -> O;
 }
 
 /// An interface to apply a trained model.
