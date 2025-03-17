@@ -16,7 +16,7 @@ pub fn build(c: &mut Criterion) {
     c.bench_function("optics::build", |b| {
         b.iter(|| {
             let mut model = Optics::new(0.5, 10, Euclidean::default());
-            model.fit(&array);
+            model.fit(&array, None);
         })
     });
 }
@@ -29,7 +29,7 @@ pub fn uniform_clusters(c: &mut Criterion) {
     c.bench_function("optics::uniform_clusters", |b| {
         b.iter(|| {
             let mut model = Optics::new(1., 10, Euclidean::default());
-            model.fit(&array.view());
+            model.fit(&array.view(), None);
         })
     });
 }
@@ -44,7 +44,7 @@ pub fn fixed_clusters(c: &mut Criterion) {
     c.bench_function("optics::fixed_clusters", |b| {
         b.iter(|| {
             let mut model = Optics::new(0.3, 10, Euclidean::default());
-            model.fit(&array.view());
+            model.fit(&array.view(), None);
         })
     });
 }

@@ -23,7 +23,7 @@ use super::Fit;
 /// use petal_clustering::{Optics, Fit};
 ///
 /// let points = array![[1., 2.], [2., 5.], [3., 6.], [8., 7.], [8., 8.], [7., 3.]];
-/// let clustering = Optics::new(4.5, 2, Euclidean::default()).fit(&points);
+/// let clustering = Optics::new(4.5, 2, Euclidean::default()).fit(&points, None);
 ///
 /// assert_eq!(clustering.0.len(), 2);        // two clusters found
 /// assert_eq!(clustering.0[&0], [0, 1, 2]);  // the first three points in Cluster 0
@@ -116,7 +116,11 @@ where
     S: Data<Elem = A> + Sync,
     M: Metric<A> + Clone + Sync,
 {
-    fn fit(&mut self, input: &ArrayBase<S, Ix2>) -> (HashMap<usize, Vec<usize>>, Vec<usize>) {
+    fn fit(
+        &mut self,
+        input: &ArrayBase<S, Ix2>,
+        _: Option<(HashMap<usize, Vec<usize>>, Vec<usize>)>,
+    ) -> (HashMap<usize, Vec<usize>>, Vec<usize>) {
         if input.is_empty() {
             return (HashMap::new(), vec![]);
         }
@@ -324,7 +328,7 @@ mod test {
         ];
 
         let mut model = Optics::new(0.5, 2, Euclidean::default());
-        let (mut clusters, mut outliers) = model.fit(&data);
+        let (mut clusters, mut outliers) = model.fit(&data, None);
         outliers.sort_unstable();
         for (_, v) in clusters.iter_mut() {
             v.sort_unstable();
@@ -338,7 +342,7 @@ mod test {
     fn core_samples() {
         let data = array![[0.], [2.], [3.], [4.], [6.], [8.], [10.]];
         let mut model = Optics::new(1.01, 1, Euclidean::default());
-        let (clusters, outliers) = model.fit(&data);
+        let (clusters, outliers) = model.fit(&data, None);
         assert_eq!(clusters.len(), 5); // {0: [0], 1: [1, 2, 3], 2: [4], 3: [5], 4: [6]}
         assert!(outliers.is_empty());
     }
@@ -349,7 +353,7 @@ mod test {
         let input = aview2(&data);
 
         let mut model = Optics::new(0.5, 2, Euclidean::default());
-        let (clusters, outliers) = model.fit(&input);
+        let (clusters, outliers) = model.fit(&input, None);
         assert!(clusters.is_empty());
         assert!(outliers.is_empty());
     }
