@@ -72,8 +72,12 @@ where
     }
 }
 
-impl<S, A, M> Fit<ArrayBase<S, Ix2>, (HashMap<usize, Vec<usize>>, Vec<usize>, Vec<A>)>
-    for HDbscan<A, M>
+impl<S, A, M>
+    Fit<
+        ArrayBase<S, Ix2>,
+        HashMap<usize, Vec<usize>>,
+        (HashMap<usize, Vec<usize>>, Vec<usize>, Vec<A>),
+    > for HDbscan<A, M>
 where
     A: AddAssign + DivAssign + FloatCore + FromPrimitive + Sync + Send,
     S: Data<Elem = A>,
@@ -82,7 +86,7 @@ where
     fn fit(
         &mut self,
         input: &ArrayBase<S, Ix2>,
-        _: Option<(HashMap<usize, Vec<usize>>, Vec<usize>, Vec<A>)>,
+        partial_labels: Option<&HashMap<usize, Vec<usize>>>,
     ) -> (HashMap<usize, Vec<usize>>, Vec<usize>, Vec<A>) {
         if input.is_empty() {
             return (HashMap::new(), Vec::new(), Vec::new());
@@ -121,7 +125,8 @@ where
         let labeled = label(sorted_mst);
         let condensed = condense_mst(labeled.view(), self.min_cluster_size);
         let outlier_scores = glosh(&condensed, self.min_cluster_size);
-        let (clusters, outliers) = find_clusters(&Array1::from_vec(condensed).view());
+        let (clusters, outliers) =
+            find_clusters(&Array1::from_vec(condensed).view(), partial_labels);
         (clusters, outliers, outlier_scores)
     }
 }
@@ -172,10 +177,91 @@ fn get_stability<A: FloatCore + FromPrimitive + AddAssign + Sub>(
     )
 }
 
+fn get_bcubed<A: FloatCore + FromPrimitive + AddAssign + Sub>(
+    condensed_tree: &ArrayView1<(usize, usize, A, usize)>,
+    partial_labels: &HashMap<usize, Vec<usize>>,
+) -> HashMap<usize, A> {
+    let num_labelled = partial_labels.values().fold(0, |acc, v| acc + v.len());
+
+    // min_parent gives the number of events in the hierarchy
+    let num_events = condensed_tree
+        .iter()
+        .map(|(parent, _, _, _)| *parent)
+        .min()
+        .map_or(0, |min_parent| min_parent);
+
+    // initialize the labels with the partial labels (if any)
+    let mut labels: Vec<Option<usize>> = vec![None; num_events];
+    for (label, points) in partial_labels {
+        for point in points {
+            labels[*point] = Some(*label);
+        }
+    }
+
+    let max_parent = condensed_tree
+        .iter()
+        .map(|(parent, child, _, _)| parent.max(child))
+        .max()
+        .expect("empty condensed_mst");
+
+    // bottom-up traverse the hierarchy to keep track of the counts of the labelled points
+    // (same with the reverse order iteration on the condensed_mst)
+    let mut label_map: HashMap<usize, HashMap<usize, A>> = HashMap::new();
+    let mut num_labels: Vec<A> = vec![A::zero(); max_parent + 1];
+    let mut bcubed: Vec<A> = vec![A::zero(); max_parent + 1];
+    for (parent, child, _, _) in condensed_tree.iter().rev() {
+        if *child < num_events {
+            // point is labelled
+            if let Some(label) = labels[*child] {
+                let entry = label_map.entry(*parent).or_default();
+                let count = entry.entry(label).or_insert(A::zero());
+                *count += A::one();
+                num_labels[*parent] += A::one();
+            }
+        } else {
+            // extend with child cluster count map
+            let child_map = label_map.remove(child).unwrap_or_default(); // remove to save space
+            let child_num_labelled = num_labels[*child];
+            if child_num_labelled == A::zero() {
+                continue;
+            }
+
+            let parent_map = label_map.entry(*parent).or_default();
+            for (label, count) in child_map {
+                // compute bcubed of the child cluster
+                let precision = count / child_num_labelled;
+                let recall = count / A::from(partial_labels[&label].len()).expect("invalid count");
+                let fmeasure =
+                    A::from(2).expect("invalid count") * precision * recall / (precision + recall);
+                bcubed[*child] += count * fmeasure / A::from(num_labelled).expect("invalid count");
+
+                // update the parent cluster label count map
+                let c = parent_map.entry(label).or_insert(A::zero());
+                *c += count;
+                num_labels[*parent] += count;
+            }
+        }
+    }
+
+    condensed_tree
+        .iter()
+        .fold(HashMap::new(), |mut scores, (parent, _child, _, _)| {
+            scores.entry(*parent).or_insert_with(|| bcubed[*parent]);
+            scores
+        })
+}
+
 fn find_clusters<A: FloatCore + FromPrimitive + AddAssign + Sub>(
     condensed_tree: &ArrayView1<(usize, usize, A, usize)>,
+    partial_labels: Option<&HashMap<usize, Vec<usize>>>,
 ) -> (HashMap<usize, Vec<usize>>, Vec<usize>) {
     let mut stability = get_stability(condensed_tree);
+    let mut bcubed = if let Some(partial_labels) = partial_labels {
+        get_bcubed(condensed_tree, partial_labels)
+    } else {
+        HashMap::new()
+    };
+
     let mut nodes: Vec<_> = stability.keys().copied().collect();
     nodes.sort_unstable();
     nodes.reverse();
@@ -188,7 +274,7 @@ fn find_clusters<A: FloatCore + FromPrimitive + AddAssign + Sub>(
 
     let mut clusters: HashSet<_> = stability.keys().copied().collect();
     for node in nodes {
-        let subtree_stability = tree.iter().fold(A::zero(), |acc, (p, c)| {
+        let subtree_score = tree.iter().fold(A::zero(), |acc, (p, c)| {
             if *p == node {
                 acc + *stability.get(c).expect("corrupted stability dictionary")
             } else {
@@ -196,15 +282,31 @@ fn find_clusters<A: FloatCore + FromPrimitive + AddAssign + Sub>(
             }
         });
 
-        stability.entry(node).and_modify(|v| {
-            if *v < subtree_stability {
-                clusters.remove(&node);
-                *v = subtree_stability;
+        let subtree_bcubed = tree.iter().fold(A::zero(), |acc, (p, c)| {
+            if *p == node {
+                acc + *bcubed.get(c).expect("corrupted bcubed dictionary")
             } else {
-                let bfs = bfs_tree(&tree, node);
-                for child in bfs {
-                    if child != node {
-                        clusters.remove(&child);
+                acc
+            }
+        });
+
+        stability.entry(node).and_modify(|node_stability| {
+            let node_bcubed = bcubed.entry(node).or_insert(A::zero());
+            if *node_bcubed < subtree_bcubed {
+                clusters.remove(&node);
+                *node_bcubed = subtree_bcubed;
+                *node_stability = subtree_score.max(*node_stability);
+            } else {
+                // ties are broken by the stability score
+                if *node_stability < subtree_score {
+                    clusters.remove(&node);
+                    *node_stability = subtree_score;
+                } else {
+                    let bfs = bfs_tree(&tree, node);
+                    for child in bfs {
+                        if child != node {
+                            clusters.remove(&child);
+                        }
                     }
                 }
             }
@@ -491,11 +593,9 @@ mod test {
 
         // Unsupervised clusters
         let (clusters, noise, _) = hdbscan.fit(&data, None);
-        println!("{:?}", clusters);
         assert_eq!(clusters.len(), 2); // 2 clusters found
         assert_eq!(noise, [15]); // 1 outlier found
-
-        // cluster 1:
+                                 // cluster 1:
         let c1 = clusters.keys().find(|k| clusters[k].contains(&0)).unwrap();
         assert_eq!(clusters[c1], [0, 1, 2, 3, 4]);
         // cluster 2:
@@ -509,13 +609,10 @@ mod test {
         partial_labels.insert(1, vec![3, 4]);
         partial_labels.insert(2, vec![6]);
         partial_labels.insert(3, vec![11]);
-        let (clusters, noise, _) =
-            hdbscan.fit(&data, Some((partial_labels, Vec::new(), Vec::new())));
-        println!("{:?}", clusters);
+        let (clusters, noise, _) = hdbscan.fit(&data, Some(&partial_labels));
         assert_eq!(clusters.len(), 3); // 3 clusters found
         assert_eq!(noise, [15]); // 1 outlier found
-
-        // cluster 1
+                                 // cluster 1
         let c1 = clusters.keys().find(|k| clusters[k].contains(&0)).unwrap();
         assert_eq!(clusters[c1], [0, 1, 2, 3, 4]);
         // cluster 2
@@ -570,5 +667,33 @@ mod test {
         let mut answer = HashMap::new();
         answer.insert(7, 1. / 9. + 3. / 7. + 3. / 6.);
         assert_eq!(stability_map, answer);
+    }
+
+    #[test]
+    fn get_bcubed() {
+        use ndarray::arr1;
+        use std::collections::HashMap;
+
+        let condensed = arr1(&[
+            (8, 9, 1. / 10., 4),
+            (8, 10, 1. / 10., 4),
+            (9, 0, 1. / 6., 1),
+            (9, 1, 1. / 7., 1),
+            (9, 2, 1. / 7., 1),
+            (9, 3, 1. / 6., 1),
+            (10, 4, 1. / 7., 1),
+            (10, 5, 1. / 6., 1),
+            (10, 6, 1. / 9., 1),
+            (10, 7, 1. / 9., 1),
+        ]);
+        let mut partial_labels = HashMap::new();
+        partial_labels.insert(0, vec![0, 1, 4]);
+        partial_labels.insert(1, vec![5]);
+        partial_labels.insert(2, vec![7]);
+        let bcubed_map: HashMap<usize, f64> = super::get_bcubed(&condensed.view(), &partial_labels);
+        assert_eq!(bcubed_map.len(), 3);
+        assert_eq!(bcubed_map[&8], 0.0);
+        assert!((bcubed_map[&9] - 8.0 / 25.0).abs() < f64::EPSILON);
+        assert!((bcubed_map[&10] - 4.0 / 15.0).abs() < f64::EPSILON);
     }
 }

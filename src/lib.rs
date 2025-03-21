@@ -9,11 +9,11 @@ pub use hdbscan::HDbscan;
 pub use optics::Optics;
 
 /// An interface to train a model.
-pub trait Fit<I, O>
+pub trait Fit<I, P, O>
 where
     I: ?Sized,
 {
-    fn fit(&mut self, input: &I, partial_labels: Option<O>) -> O;
+    fn fit(&mut self, input: &I, params: Option<&P>) -> O;
 }
 
 /// An interface to apply a trained model.

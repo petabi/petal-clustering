@@ -110,7 +110,9 @@ where
     }
 }
 
-impl<S, A, M> Fit<ArrayBase<S, Ix2>, (HashMap<usize, Vec<usize>>, Vec<usize>)> for Optics<A, M>
+impl<S, A, M>
+    Fit<ArrayBase<S, Ix2>, HashMap<usize, Vec<usize>>, (HashMap<usize, Vec<usize>>, Vec<usize>)>
+    for Optics<A, M>
 where
     A: AddAssign + DivAssign + FloatCore + FromPrimitive + Send + Sync,
     S: Data<Elem = A> + Sync,
@@ -119,7 +121,7 @@ where
     fn fit(
         &mut self,
         input: &ArrayBase<S, Ix2>,
-        _: Option<(HashMap<usize, Vec<usize>>, Vec<usize>)>,
+        _: Option<&HashMap<usize, Vec<usize>>>,
     ) -> (HashMap<usize, Vec<usize>>, Vec<usize>) {
         if input.is_empty() {
             return (HashMap::new(), vec![]);

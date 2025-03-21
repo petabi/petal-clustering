@@ -65,7 +65,9 @@ impl<A, M> Dbscan<A, M> {
     }
 }
 
-impl<S, A, M> Fit<ArrayBase<S, Ix2>, (HashMap<usize, Vec<usize>>, Vec<usize>)> for Dbscan<A, M>
+impl<S, A, M>
+    Fit<ArrayBase<S, Ix2>, HashMap<usize, Vec<usize>>, (HashMap<usize, Vec<usize>>, Vec<usize>)>
+    for Dbscan<A, M>
 where
     A: AddAssign + DivAssign + FloatCore + FromPrimitive + Sync,
     S: Data<Elem = A>,
@@ -74,7 +76,7 @@ where
     fn fit(
         &mut self,
         input: &ArrayBase<S, Ix2>,
-        _: Option<(HashMap<usize, Vec<usize>>, Vec<usize>)>,
+        _: Option<&HashMap<usize, Vec<usize>>>,
     ) -> (HashMap<usize, Vec<usize>>, Vec<usize>) {
         // `BallTree` does not accept an empty input.
         if input.is_empty() {
