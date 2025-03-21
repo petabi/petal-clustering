@@ -393,10 +393,9 @@ mod test {
 
     #[test]
     fn outlier_scores() {
+        use crate::Fit;
         use ndarray::array;
         use petal_neighbors::distance::Euclidean;
-
-        use crate::Fit;
 
         let data = array![
             // cluster1:
@@ -451,6 +450,80 @@ mod test {
         // Then the outlier score of outlier2 is:
         //      glosh(outlier2) =  1 - √2 / √37 = 0.76750472251
         assert_eq!(outlier_scores[15], 1.0 - 2.0_f64.sqrt() / 37.0_f64.sqrt());
+    }
+
+    #[test]
+    fn partial_labels() {
+        use crate::Fit;
+        use ndarray::array;
+        use petal_neighbors::distance::Euclidean;
+        use std::collections::HashMap;
+
+        let data = array![
+            // Group 1 (formed at eps = √2)
+            [1.0, 9.0],
+            [2.0, 9.0],
+            [1.0, 8.0],
+            [2.0, 8.0],
+            [3.0, 7.0],
+            // Group 2 (formed at eps = √2)
+            [5.0, 4.0],
+            [6.0, 4.0],
+            [5.0, 3.0],
+            [6.0, 3.0],
+            // Group 3 (formed at eps = √2)
+            [8.0, 3.0],
+            [9.0, 3.0],
+            [8.0, 2.0],
+            [9.0, 2.0],
+            [8.0, 1.0],
+            [9.0, 1.0],
+            // noise (joins the root cluster at eps = √37)
+            [7.0, 8.0],
+        ];
+        let mut hdbscan = super::HDbscan {
+            min_samples: 4,
+            min_cluster_size: 4,
+            metric: Euclidean::default(),
+            boruvka: false,
+            ..Default::default()
+        };
+
+        // Unsupervised clusters
+        let (clusters, noise, _) = hdbscan.fit(&data, None);
+        println!("{:?}", clusters);
+        assert_eq!(clusters.len(), 2); // 2 clusters found
+        assert_eq!(noise, [15]); // 1 outlier found
+
+        // cluster 1:
+        let c1 = clusters.keys().find(|k| clusters[k].contains(&0)).unwrap();
+        assert_eq!(clusters[c1], [0, 1, 2, 3, 4]);
+        // cluster 2:
+        let c2 = clusters.keys().find(|k| clusters[k].contains(&5)).unwrap();
+        assert_eq!(clusters[c2], [5, 6, 7, 8, 9, 10, 11, 12, 13, 14]);
+        assert_eq!(noise, [15]);
+
+        // Semi-supervised clustering
+        let mut partial_labels: HashMap<usize, Vec<usize>> = HashMap::new();
+        partial_labels.insert(0, vec![0]);
+        partial_labels.insert(1, vec![3, 4]);
+        partial_labels.insert(2, vec![6]);
+        partial_labels.insert(3, vec![11]);
+        let (clusters, noise, _) =
+            hdbscan.fit(&data, Some((partial_labels, Vec::new(), Vec::new())));
+        println!("{:?}", clusters);
+        assert_eq!(clusters.len(), 3); // 3 clusters found
+        assert_eq!(noise, [15]); // 1 outlier found
+
+        // cluster 1
+        let c1 = clusters.keys().find(|k| clusters[k].contains(&0)).unwrap();
+        assert_eq!(clusters[c1], [0, 1, 2, 3, 4]);
+        // cluster 2
+        let c2 = clusters.keys().find(|k| clusters[k].contains(&5)).unwrap();
+        assert_eq!(clusters[c2], [5, 6, 7, 8]);
+        // cluster 3
+        let c3 = clusters.keys().find(|k| clusters[k].contains(&9)).unwrap();
+        assert_eq!(clusters[c3], [9, 10, 11, 12, 13, 14]);
     }
 
     #[test]
