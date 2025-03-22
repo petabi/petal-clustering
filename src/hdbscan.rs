@@ -492,9 +492,10 @@ mod test {
 
     #[test]
     fn outlier_scores() {
-        use crate::Fit;
         use ndarray::array;
         use petal_neighbors::distance::Euclidean;
+
+        use crate::Fit;
 
         let data = array![
             // cluster1:
@@ -553,10 +554,12 @@ mod test {
 
     #[test]
     fn partial_labels() {
-        use crate::Fit;
+        use std::collections::HashMap;
+
         use ndarray::array;
         use petal_neighbors::distance::Euclidean;
-        use std::collections::HashMap;
+
+        use crate::Fit;
 
         let data = array![
             // Group 1 (formed at eps = √2)
@@ -669,8 +672,9 @@ mod test {
 
     #[test]
     fn get_bcubed() {
-        use ndarray::arr1;
         use std::collections::HashMap;
+
+        use ndarray::arr1;
 
         let condensed = arr1(&[
             (8, 9, 1. / 10., 4),
