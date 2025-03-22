@@ -274,7 +274,7 @@ fn find_clusters<A: FloatCore + FromPrimitive + AddAssign + Sub>(
 
     let mut clusters: HashSet<_> = stability.keys().copied().collect();
     for node in nodes {
-        let subtree_score = tree.iter().fold(A::zero(), |acc, (p, c)| {
+        let subtree_stability = tree.iter().fold(A::zero(), |acc, (p, c)| {
             if *p == node {
                 acc + *stability.get(c).expect("corrupted stability dictionary")
             } else {
@@ -292,21 +292,18 @@ fn find_clusters<A: FloatCore + FromPrimitive + AddAssign + Sub>(
 
         stability.entry(node).and_modify(|node_stability| {
             let node_bcubed = bcubed.entry(node).or_insert(A::zero());
-            if *node_bcubed < subtree_bcubed {
+            // ties are broken by stability
+            if *node_bcubed < subtree_bcubed
+                || (*node_bcubed == subtree_bcubed && *node_stability < subtree_stability)
+            {
                 clusters.remove(&node);
                 *node_bcubed = subtree_bcubed;
-                *node_stability = subtree_score.max(*node_stability);
+                *node_stability = subtree_stability.max(*node_stability);
             } else {
-                // ties are broken by the stability score
-                if *node_stability < subtree_score {
-                    clusters.remove(&node);
-                    *node_stability = subtree_score;
-                } else {
-                    let bfs = bfs_tree(&tree, node);
-                    for child in bfs {
-                        if child != node {
-                            clusters.remove(&child);
-                        }
+                let bfs = bfs_tree(&tree, node);
+                for child in bfs {
+                    if child != node {
+                        clusters.remove(&child);
                     }
                 }
             }
