@@ -9,6 +9,13 @@ pub use hdbscan::HDbscan;
 pub use optics::Optics;
 
 /// An interface to train a model.
+///
+/// # Parameters
+/// - `input`: A reference to the input data of type `I` that the model will fit.
+/// - `params`: An optional reference to parameters of type `P` that can be used to configure the fitting process.
+///
+/// # Returns
+/// - Returns an output of type `O` which represents the result of the fitting process.
 pub trait Fit<I, P, O>
 where
     I: ?Sized,

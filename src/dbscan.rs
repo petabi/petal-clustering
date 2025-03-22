@@ -65,6 +65,16 @@ impl<A, M> Dbscan<A, M> {
     }
 }
 
+/// Fits the DBSCAN clustering algorithm to the given input data.
+///
+/// # Parameters
+/// - `input`: A 2D array representing the dataset to cluster. Each row corresponds to a data point.
+/// - `_params`: An optional parameter for prelabelled data. Not used in this implementation, but required for consistency.
+///
+/// # Returns
+/// A tuple containing:
+/// - `HashMap<usize, Vec<usize>>`: A mapping of cluster IDs to the indices of points in each cluster.
+/// - `Vec<usize>`: A vector of indices representing the noise points that do not belong to any cluster.
 impl<S, A, M>
     Fit<ArrayBase<S, Ix2>, HashMap<usize, Vec<usize>>, (HashMap<usize, Vec<usize>>, Vec<usize>)>
     for Dbscan<A, M>
@@ -76,7 +86,7 @@ where
     fn fit(
         &mut self,
         input: &ArrayBase<S, Ix2>,
-        _: Option<&HashMap<usize, Vec<usize>>>,
+        _params: Option<&HashMap<usize, Vec<usize>>>,
     ) -> (HashMap<usize, Vec<usize>>, Vec<usize>) {
         // `BallTree` does not accept an empty input.
         if input.is_empty() {
