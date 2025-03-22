@@ -592,12 +592,16 @@ mod test {
         let (clusters, noise, _) = hdbscan.fit(&data, None);
         assert_eq!(clusters.len(), 2); // 2 clusters found
         assert_eq!(noise, [15]); // 1 outlier found
-                                 // cluster 1:
         let c1 = clusters.keys().find(|k| clusters[k].contains(&0)).unwrap();
         assert_eq!(clusters[c1], [0, 1, 2, 3, 4]);
-        // cluster 2:
         let c2 = clusters.keys().find(|k| clusters[k].contains(&5)).unwrap();
         assert_eq!(clusters[c2], [5, 6, 7, 8, 9, 10, 11, 12, 13, 14]);
+        assert_eq!(noise, [15]);
+
+        // Empty partial labels (should return the same result as unsupervised clustering)
+        let partial_labels: HashMap<usize, Vec<usize>> = HashMap::new();
+        let (answer, noise, _) = hdbscan.fit(&data, Some(&partial_labels));
+        assert_eq!(answer, clusters);
         assert_eq!(noise, [15]);
 
         // Semi-supervised clustering
@@ -609,13 +613,10 @@ mod test {
         let (clusters, noise, _) = hdbscan.fit(&data, Some(&partial_labels));
         assert_eq!(clusters.len(), 3); // 3 clusters found
         assert_eq!(noise, [15]); // 1 outlier found
-                                 // cluster 1
         let c1 = clusters.keys().find(|k| clusters[k].contains(&0)).unwrap();
         assert_eq!(clusters[c1], [0, 1, 2, 3, 4]);
-        // cluster 2
         let c2 = clusters.keys().find(|k| clusters[k].contains(&5)).unwrap();
         assert_eq!(clusters[c2], [5, 6, 7, 8]);
-        // cluster 3
         let c3 = clusters.keys().find(|k| clusters[k].contains(&9)).unwrap();
         assert_eq!(clusters[c3], [9, 10, 11, 12, 13, 14]);
     }
