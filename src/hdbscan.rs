@@ -72,6 +72,28 @@ where
     }
 }
 
+/// Fits the HDBSCAN clustering algorithm to the given input data.
+///
+/// # Parameters
+/// - `input`: A 2D array representing the dataset to cluster. Each row corresponds to a data point.
+/// - `partial_labels`: An optional parameter for prelabelled data.
+///
+/// # Returns
+/// A tuple containing:
+/// - `HashMap<usize, Vec<usize>>`: A mapping of cluster IDs to the indices of points in each cluster.
+/// - `Vec<usize>`: A vector of indices representing the noise points that do not belong to any cluster.
+/// - `Vec<A>`: A vector of outlier scores for each data point.
+///
+/// # Notes
+/// - The outlier scores are computed using the GLOSH algorithm.
+/// - If `partial_labels` is provided, the algorithm will perform semi-supervised clustering using BC (`BCubed`) algorithm,
+///   otherwise, it will perform unsupervised clustering using Excess of Mass (`EoM`) algorithm.
+///
+/// # References
+/// - Campello, Ricardo JGB, et al. "Hierarchical density estimates for data clustering, visualization, and outlier detection."
+///   ACM Transactions on Knowledge Discovery from Data (TKDD) 10.1 (2015): 1-51.
+/// - Castro Gertrudes, Jadson, et al. "A unified view of density-based methods for semi-supervised clustering and classification."
+///   Data mining and knowledge discovery 33.6 (2019): 1894-1952.
 impl<S, A, M>
     Fit<
         ArrayBase<S, Ix2>,
@@ -499,26 +521,26 @@ mod test {
 
         let data = array![
             // cluster1:
-            [1.0, 1.0],
-            [1.0, 2.0],
-            [2.0, 1.0],
-            [2.0, 2.0],
+            [1., 1.],
+            [1., 2.],
+            [2., 1.],
+            [2., 2.],
             // cluster2:
-            [4.0, 1.0],
-            [4.0, 2.0],
-            [5.0, 1.0],
-            [5.0, 2.0],
+            [4., 1.],
+            [4., 2.],
+            [5., 1.],
+            [5., 2.],
             // cluster3:
-            [9.0, 1.0],
-            [9.0, 2.0],
-            [10.0, 1.0],
-            [10.0, 2.0],
-            [11.0, 1.0],
-            [11.0, 2.0],
+            [9., 1.],
+            [9., 2.],
+            [10., 1.],
+            [10., 2.],
+            [11., 1.],
+            [11., 2.],
             // outlier1:
-            [2.0, 5.0],
+            [2., 5.],
             // outlier2:
-            [10.0, 8.0],
+            [10., 8.],
         ];
         let mut hdbscan = super::HDbscan {
             alpha: 1.,
@@ -563,25 +585,25 @@ mod test {
 
         let data = array![
             // Group 1 (formed at eps = √2)
-            [1.0, 9.0],
-            [2.0, 9.0],
-            [1.0, 8.0],
-            [2.0, 8.0],
-            [3.0, 7.0],
+            [1., 9.],
+            [2., 9.],
+            [1., 8.],
+            [2., 8.],
+            [3., 7.],
             // Group 2 (formed at eps = √2)
-            [5.0, 4.0],
-            [6.0, 4.0],
-            [5.0, 3.0],
-            [6.0, 3.0],
+            [5., 4.],
+            [6., 4.],
+            [5., 3.],
+            [6., 3.],
             // Group 3 (formed at eps = √2)
-            [8.0, 3.0],
-            [9.0, 3.0],
-            [8.0, 2.0],
-            [9.0, 2.0],
-            [8.0, 1.0],
-            [9.0, 1.0],
+            [8., 3.],
+            [9., 3.],
+            [8., 2.],
+            [9., 2.],
+            [8., 1.],
+            [9., 1.],
             // noise (joins the root cluster at eps = √37)
-            [7.0, 8.0],
+            [7., 8.],
         ];
         let mut hdbscan = super::HDbscan {
             min_samples: 4,
@@ -695,7 +717,7 @@ mod test {
         let bcubed_map: HashMap<usize, f64> = super::get_bcubed(&condensed.view(), &partial_labels);
         assert_eq!(bcubed_map.len(), 3);
         assert_eq!(bcubed_map[&8], 0.0);
-        assert!((bcubed_map[&9] - 8.0 / 25.0).abs() < f64::EPSILON);
-        assert!((bcubed_map[&10] - 4.0 / 15.0).abs() < f64::EPSILON);
+        assert!((bcubed_map[&9] - 8. / 25.).abs() < f64::EPSILON);
+        assert!((bcubed_map[&10] - 4. / 15.).abs() < f64::EPSILON);
     }
 }
