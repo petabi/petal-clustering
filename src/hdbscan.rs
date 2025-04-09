@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::fmt::Debug;
 use std::ops::{AddAssign, DivAssign, Sub};
 
@@ -9,8 +9,8 @@ use petal_neighbors::BallTree;
 use serde::{Deserialize, Serialize};
 
 use super::Fit;
-use crate::mst::{bfs_tree, condense_mst, mst_linkage, Boruvka};
-use crate::union_find::{TreeUnionFind, UnionFind};
+use crate::mst::{condense_mst, mst_linkage, Boruvka};
+use crate::union_find::UnionFind;
 
 /// HDBSCAN (hierarchical density-based spatial clustering of applications with noise)
 /// clustering algorithm.
@@ -220,7 +220,7 @@ fn get_bcubed<A: FloatCore + FromPrimitive + AddAssign + Sub>(
         }
     }
 
-    let max_parent = condensed_tree
+    let num_clusters = condensed_tree
         .iter()
         .map(|(parent, child, _, _)| parent.max(child))
         .max()
@@ -229,8 +229,8 @@ fn get_bcubed<A: FloatCore + FromPrimitive + AddAssign + Sub>(
     // bottom-up traverse the hierarchy to keep track of the counts of the labelled points
     // (same with the reverse order iteration on the condensed_mst)
     let mut label_map: HashMap<usize, HashMap<usize, A>> = HashMap::new();
-    let mut num_labels: Vec<A> = vec![A::zero(); max_parent + 1];
-    let mut bcubed: Vec<A> = vec![A::zero(); max_parent + 1];
+    let mut num_labels: Vec<A> = vec![A::zero(); num_clusters + 1];
+    let mut bcubed: Vec<A> = vec![A::zero(); num_clusters + 1];
     for (parent, child, _, _) in condensed_tree.iter().rev() {
         if *child < num_events {
             // point is labelled
@@ -244,9 +244,6 @@ fn get_bcubed<A: FloatCore + FromPrimitive + AddAssign + Sub>(
             // extend with child cluster count map
             let child_map = label_map.remove(child).unwrap_or_default(); // remove to save space
             let child_num_labelled = num_labels[*child];
-            if child_num_labelled == A::zero() {
-                continue;
-            }
 
             let parent_map = label_map.entry(*parent).or_default();
             for (label, count) in child_map {
@@ -286,86 +283,75 @@ fn find_clusters<A: FloatCore + FromPrimitive + AddAssign + Sub>(
 
     let mut nodes: Vec<_> = stability.keys().copied().collect();
     nodes.sort_unstable();
-    nodes.reverse();
-    nodes.remove(nodes.len() - 1);
+    nodes.remove(0); // remove the root node
 
-    let tree: Vec<_> = condensed_tree
-        .iter()
-        .filter_map(|(p, c, _, s)| if *s > 1 { Some((*p, *c)) } else { None })
-        .collect();
+    let adj: HashMap<usize, Vec<usize>> =
+        condensed_tree
+            .iter()
+            .fold(HashMap::new(), |mut adj, (p, c, _, _)| {
+                adj.entry(*p).or_default().push(*c);
+                adj
+            });
 
-    let mut clusters: HashSet<_> = stability.keys().copied().collect();
-    for node in nodes {
-        let subtree_stability = tree.iter().fold(A::zero(), |acc, (p, c)| {
-            if *p == node {
-                acc + *stability.get(c).expect("corrupted stability dictionary")
-            } else {
-                acc
-            }
-        });
-
-        let subtree_bcubed = tree.iter().fold(A::zero(), |acc, (p, c)| {
-            if *p == node {
-                acc + *bcubed.get(c).expect("corrupted bcubed dictionary")
-            } else {
-                acc
-            }
-        });
-
-        stability.entry(node).and_modify(|node_stability| {
-            let node_bcubed = bcubed.entry(node).or_insert(A::zero());
-            // ties are broken by stability
-            if *node_bcubed < subtree_bcubed
-                || (*node_bcubed == subtree_bcubed && *node_stability < subtree_stability)
-            {
-                clusters.remove(&node);
-                *node_bcubed = subtree_bcubed;
-                *node_stability = subtree_stability.max(*node_stability);
-            } else {
-                let bfs = bfs_tree(&tree, node);
-                for child in bfs {
-                    if child != node {
-                        clusters.remove(&child);
-                    }
-                }
-            }
-        });
-    }
-
-    let mut clusters: Vec<_> = clusters.into_iter().collect();
-    clusters.sort_unstable();
-    let clusters: HashMap<_, _> = clusters
-        .into_iter()
-        .enumerate()
-        .map(|(id, c)| (c, id))
-        .collect();
-    let max_parent = condensed_tree
+    let num_clusters = condensed_tree
         .iter()
         .max_by_key(|v| v.0)
         .expect("no maximum parent available")
         .0;
-    let min_parent = condensed_tree
+
+    // bottom-up traverse the nodes to select the most top-level clusters
+    let mut clusters: Vec<Option<usize>> = vec![None; num_clusters + 1];
+    for node in nodes.iter().rev() {
+        let subtree_stability = adj.get(node).map_or(A::zero(), |children| {
+            children.iter().fold(A::zero(), |acc, c| {
+                acc + *stability.get(c).unwrap_or(&A::zero())
+            })
+        });
+
+        let subtree_bcubed = adj.get(node).map_or(A::zero(), |children| {
+            children.iter().fold(A::zero(), |acc, c| {
+                acc + *bcubed.get(c).unwrap_or(&A::zero())
+            })
+        });
+
+        stability.entry(*node).and_modify(|node_stability| {
+            let node_bcubed = bcubed.entry(*node).or_insert(A::zero());
+            // ties are broken by stability
+            if *node_bcubed < subtree_bcubed
+                || (*node_bcubed == subtree_bcubed && *node_stability < subtree_stability)
+            {
+                *node_bcubed = subtree_bcubed;
+                *node_stability = subtree_stability.max(*node_stability);
+            } else {
+                clusters[*node] = Some(*node);
+            }
+        });
+    }
+
+    // now tow-down pass to assign the clusters
+    for node in nodes {
+        if let Some(cluster) = clusters[node] {
+            let children = adj.get(&node).expect("corrupted adjacency dictionary");
+            for child in children {
+                clusters[*child] = Some(cluster);
+            }
+        }
+    }
+
+    let num_events = condensed_tree
         .iter()
         .min_by_key(|v| v.0)
         .expect("no minimum parent available")
         .0;
 
-    let mut uf = TreeUnionFind::new(max_parent + 1);
-    for (parent, child, _, _) in condensed_tree {
-        if !clusters.contains_key(child) {
-            uf.union(*parent, *child);
-        }
-    }
-
     let mut res_clusters: HashMap<_, Vec<_>> = HashMap::new();
     let mut outliers = vec![];
-    for n in 0..min_parent {
-        let cluster = uf.find(n);
-        if cluster > min_parent {
-            let c = res_clusters.entry(cluster).or_default();
-            c.push(n);
+    for (point, cluster) in clusters.iter().enumerate().take(num_events) {
+        if let Some(cluster) = cluster {
+            let c = res_clusters.entry(*cluster).or_default();
+            c.push(point);
         } else {
-            outliers.push(n);
+            outliers.push(point);
         }
     }
     (res_clusters, outliers)
@@ -429,7 +415,7 @@ fn max_lambdas<A: FloatCore>(
     condensed_mst: &[(usize, usize, A, usize)],
     min_cluster_size: usize,
 ) -> Vec<A> {
-    let largest_cluster_id = condensed_mst
+    let num_clusters = condensed_mst
         .iter()
         .map(|(parent, child, _, _)| parent.max(child))
         .max()
@@ -437,8 +423,8 @@ fn max_lambdas<A: FloatCore>(
 
     // bottom-up traverse the hierarchy to keep track of the maximum lambda values
     // (same with the reverse order iteration on the condensed_mst)
-    let mut parent_sizes: Vec<usize> = vec![0; largest_cluster_id + 1];
-    let mut deaths_arr: Vec<A> = vec![A::zero(); largest_cluster_id + 1];
+    let mut parent_sizes: Vec<usize> = vec![0; num_clusters + 1];
+    let mut deaths_arr: Vec<A> = vec![A::zero(); num_clusters + 1];
     for (parent, child, lambda, child_size) in condensed_mst.iter().rev() {
         parent_sizes[*parent] += *child_size;
         if parent_sizes[*parent] >= min_cluster_size {
