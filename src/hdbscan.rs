@@ -317,14 +317,13 @@ fn find_clusters<A: FloatCore + FromPrimitive + AddAssign + Sub>(
         stability.entry(*node).and_modify(|node_stability| {
             let node_bcubed = bcubed.entry(*node).or_insert(A::zero());
             // ties are broken by stability
-            if *node_bcubed < subtree_bcubed
-                || (*node_bcubed == subtree_bcubed && *node_stability < subtree_stability)
+            if *node_bcubed > subtree_bcubed
+                || (*node_bcubed == subtree_bcubed && *node_stability >= subtree_stability)
             {
-                *node_bcubed = subtree_bcubed;
-                *node_stability = subtree_stability.max(*node_stability);
-            } else {
                 clusters[*node] = Some(*node);
             }
+            *node_bcubed = node_bcubed.max(subtree_bcubed);
+            *node_stability = node_stability.max(subtree_stability);
         });
     }
 
