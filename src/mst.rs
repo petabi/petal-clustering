@@ -1,4 +1,3 @@
-use std::collections::HashSet;
 use std::convert::TryFrom;
 use std::mem::MaybeUninit;
 use std::ops::{AddAssign, Div, DivAssign};
@@ -98,26 +97,6 @@ pub fn mst_linkage<A: FloatCore>(
     }
 
     unsafe { mst.assume_init() }
-}
-
-pub fn bfs_tree(tree: &[(usize, usize)], root: usize) -> Vec<usize> {
-    let mut result = vec![];
-    let mut to_process = HashSet::new();
-    to_process.insert(root);
-    while !to_process.is_empty() {
-        result.extend(to_process.iter());
-        to_process = tree
-            .iter()
-            .filter_map(|(p, c)| {
-                if to_process.contains(p) {
-                    Some(*c)
-                } else {
-                    None
-                }
-            })
-            .collect::<HashSet<_>>();
-    }
-    result
 }
 
 fn bfs_mst<A: FloatCore>(mst: ArrayView1<(usize, usize, A, usize)>, start: usize) -> Vec<usize> {
