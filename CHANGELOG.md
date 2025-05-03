@@ -5,6 +5,34 @@ file is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and
 this project adheres to [Semantic
 Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.0] - 2025-05-03
+
+### Added
+
+- Implemented semi-supervised clustering capability for the `HDbscan` algorithm.
+  This allows users to provide partially labeled data (as an
+  `Option<&HashMap<usize, Vec<usize>>>`) to the `fit` method. The algorithm
+  leverages these known labels using the BCubed metric to guide cluster
+  formation, aiming to place points with the same label into the same cluster
+  while still discovering density-based clusters in the unlabeled data. Test
+  results on the Digits dataset show improved Adjusted Rand Index (ARI) scores
+  compared to unsupervised HDBSCAN when using 10% partial labels, aligning
+  closely with the reference Python implementation.
+
+### Changed
+
+- Requires Rust 1.81 or later.
+- Updated petal-neighbors to 0.13.0.
+- The `Fit` trait signature has been modified to support optional parameters
+  during fitting. The `fit` method now accepts an additional `params:
+  Option<&P>` argument:
+  - Old signature: `fn fit(&mut self, input: &I) -> O;`
+  - New signature: `fn fit(&mut self, input: &I, params: Option<&P>) -> O;`
+- Calls to `fit` for `HDbscan`, `Dbscan`, and `Optics` need to be updated.
+  - For `HDbscan`, pass `Some(&partial_labels_map)` to enable semi-supervised
+    mode or `None` for standard unsupervised clustering.
+  - For `Dbscan` and `Optics`, the `params` argument is currently unused; pass `None`.
+
 ## [0.11.0] - 2025-03-05
 
 ### Changed
@@ -142,6 +170,7 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 - The [OPTICS](https://en.wikipedia.org/wiki/OPTICS_algorithm) clustering
   algorithm.
 
+[0.12.0]: https://github.com/petabi/petal-clustering/compare/0.11.0...0.12.0
 [0.11.0]: https://github.com/petabi/petal-clustering/compare/0.10.0...0.11.0
 [0.10.0]: https://github.com/petabi/petal-clustering/compare/0.9.0...0.10.0
 [0.9.0]: https://github.com/petabi/petal-clustering/compare/0.8.0...0.9.0
