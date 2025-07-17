@@ -49,7 +49,6 @@ impl<A> Default for Optics<A, Euclidean>
 where
     A: FloatCore,
 {
-    #[must_use]
     fn default() -> Self {
         Self {
             eps: A::from(0.5_f32).expect("valid float"),
