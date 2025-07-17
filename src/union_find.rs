@@ -111,7 +111,8 @@ impl UnionFind {
         n
     }
 
-    pub fn size(&self, x: usize) -> usize {
+    pub fn size(&mut self, x: usize) -> usize {
+        let x = self.fast_find(x);
         self.size[x]
     }
 }

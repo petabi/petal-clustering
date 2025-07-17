@@ -161,17 +161,15 @@ fn label<A: FloatCore>(mst: &Array1<(usize, usize, A)>) -> Array1<(usize, usize,
 
     // Iterate over the edges in the MST in batches by their delta (to handle ties consistently):
     for (delta, batch) in &mst.iter().chunk_by(|(_, _, a)| *a) {
-        let mut edges: Vec<_> = batch.collect();
-
         // Sort edges by the minimum size of the clusters they connect (in descending order):
-        edges.sort_unstable_by_key(|(a, b, _)| {
-            let a = uf.fast_find(*a);
-            let b = uf.fast_find(*b);
-            std::cmp::Reverse(uf.size(a).min(uf.size(b)))
-        });
+        let mut edges: Vec<_> = batch
+            .into_iter()
+            .map(|(a, b, _)| (a, b, uf.size(*a).min(uf.size(*b))))
+            .collect();
+        edges.sort_unstable_by_key(|(_, _, size)| std::cmp::Reverse(*size));
 
         // Now merge edges:
-        for (a, b, _) in &edges {
+        for (a, b, _) in edges {
             let a = uf.fast_find(*a);
             let b = uf.fast_find(*b);
             labeled_mst.push((a, b, delta, uf.union(a, b)));
