@@ -145,7 +145,7 @@ where
 
         mst.sort_unstable_by(|a, b| a.2.partial_cmp(&(b.2)).expect("invalid distance"));
         let sorted_mst = Array1::from_vec(mst);
-        let labeled = label(&sorted_mst, self.min_cluster_size);
+        let labeled = label(&sorted_mst);
         let condensed = condense_mst(labeled.view(), self.min_cluster_size);
         let outlier_scores = glosh(&condensed, self.min_cluster_size);
         let (clusters, outliers) =
@@ -154,34 +154,27 @@ where
     }
 }
 
-fn label<A: FloatCore>(
-    mst: &Array1<(usize, usize, A)>,
-    min_cluster_size: usize,
-) -> Array1<(usize, usize, A, usize)> {
+fn label<A: FloatCore>(mst: &Array1<(usize, usize, A)>) -> Array1<(usize, usize, A, usize)> {
     let n = mst.len() + 1;
     let mut uf = UnionFind::new(n);
     let mut labeled_mst = Vec::with_capacity(mst.len());
 
     // Iterate over the edges in the MST in batches by their delta (to handle ties consistently):
     for (delta, batch) in &mst.iter().chunk_by(|(_, _, a)| *a) {
-        let edges: Vec<_> = batch.collect();
+        let mut edges: Vec<_> = batch.collect();
 
-        // Merge edges that connects clusters first:
+        // Sort edges by the minimum size of the clusters they connect (in descending order):
+        edges.sort_unstable_by_key(|(a, b, _)| {
+            let a = uf.fast_find(*a);
+            let b = uf.fast_find(*b);
+            std::cmp::Reverse(uf.size(a).min(uf.size(b)))
+        });
+
+        // Now merge edges:
         for (a, b, _) in &edges {
             let a = uf.fast_find(*a);
             let b = uf.fast_find(*b);
-            if uf.size(a) >= min_cluster_size && uf.size(b) >= min_cluster_size {
-                labeled_mst.push((a, b, delta, uf.union(a, b)));
-            }
-        }
-
-        // Now, merge edges that connects points:
-        for (a, b, _) in &edges {
-            let a = uf.fast_find(*a);
-            let b = uf.fast_find(*b);
-            if a != b {
-                labeled_mst.push((a, b, delta, uf.union(a, b)));
-            }
+            labeled_mst.push((a, b, delta, uf.union(a, b)));
         }
     }
     Array1::from_vec(labeled_mst)
@@ -665,7 +658,7 @@ mod test {
             (1, 4, 7.),
             (4, 6, 9.),
         ]);
-        let labeled_mst = super::label(&mst, 2);
+        let labeled_mst = super::label(&mst);
         assert_eq!(
             labeled_mst,
             arr1(&[
@@ -682,7 +675,6 @@ mod test {
     #[test]
     fn label_consistency() {
         use ndarray::arr1;
-        let min_cluster_size = 2; // to ensure that clusters are merged
         let mst = arr1(&[
             (0, 3, 5.),
             (4, 2, 5.),
@@ -691,7 +683,7 @@ mod test {
             (0, 4, 7.), // this should be merged first (both 4 and 2 represent clusters)
             (4, 6, 9.),
         ]);
-        let labeled_mst = super::label(&mst, min_cluster_size);
+        let labeled_mst = super::label(&mst);
         assert_eq!(
             labeled_mst,
             arr1(&[
