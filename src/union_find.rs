@@ -110,6 +110,10 @@ impl UnionFind {
         }
         n
     }
+
+    pub fn size(&self, x: usize) -> usize {
+        self.size[x]
+    }
 }
 
 mod test {
