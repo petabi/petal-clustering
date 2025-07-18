@@ -160,10 +160,10 @@ fn label<A: FloatCore>(mst: &Array1<(usize, usize, A)>) -> Array1<(usize, usize,
 
     // Iterate over the edges in the MST in batches by their delta (to handle ties consistently):
     for (delta, batch) in &mst.iter().chunk_by(|(_, _, a)| *a) {
-        // Sort edges by the minimum size of the clusters they connect (in descending order):
+        // Sort edges by the combined size of the clusters they connect (in descending order):
         let mut edges: Vec<_> = batch
             .into_iter()
-            .map(|(a, b, _)| (a, b, uf.size(*a).min(uf.size(*b))))
+            .map(|(a, b, _)| (a, b, uf.size(*a) + uf.size(*b)))
             .collect();
         edges.sort_unstable_by_key(|(_, _, size)| std::cmp::Reverse(*size));
 
