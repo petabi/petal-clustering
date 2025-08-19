@@ -67,51 +67,6 @@ impl TreeUnionFind {
     }
 }
 
-pub struct UnionFind {
-    parent: Vec<usize>,
-    size: Vec<usize>,
-    next_label: usize,
-}
-
-impl UnionFind {
-    pub fn new(n: usize) -> Self {
-        let parent = (0..2 * n).collect();
-        let size = vec![1]
-            .into_iter()
-            .cycle()
-            .take(n)
-            .chain(vec![0].into_iter().cycle().take(n - 1))
-            .collect();
-        Self {
-            parent,
-            size,
-            next_label: n,
-        }
-    }
-
-    pub fn union(&mut self, m: usize, n: usize) -> usize {
-        self.parent[m] = self.next_label;
-        self.parent[n] = self.next_label;
-        let res = self.size[m] + self.size[n];
-        self.size[self.next_label] = res;
-        self.next_label += 1;
-        res
-    }
-
-    pub fn fast_find(&mut self, mut n: usize) -> usize {
-        let mut root = n;
-        while self.parent[n] != n {
-            n = self.parent[n];
-        }
-        while self.parent[root] != n {
-            let tmp = self.parent[root];
-            self.parent[root] = n;
-            root = tmp;
-        }
-        n
-    }
-}
-
 mod test {
 
     #[test]
@@ -140,30 +95,5 @@ mod test {
         uf = super::TreeUnionFind::new(3);
         assert_eq!((0..3).collect::<Vec<_>>(), uf.parent);
         assert_eq!(vec![0; 3], uf.size);
-    }
-
-    #[test]
-    fn union_find() {
-        let mut uf = super::UnionFind::new(7);
-        let pairs = vec![(0, 3), (4, 2), (3, 5), (0, 1), (1, 4), (4, 6)];
-        let uf_res: Vec<_> = pairs
-            .into_iter()
-            .map(|(l, r)| {
-                let ll = uf.fast_find(l);
-                let rr = uf.fast_find(r);
-                (ll, rr, uf.union(ll, rr))
-            })
-            .collect();
-        assert_eq!(
-            uf_res,
-            vec![
-                (0, 3, 2),
-                (4, 2, 2),
-                (7, 5, 3),
-                (9, 1, 4),
-                (10, 8, 6),
-                (11, 6, 7)
-            ]
-        )
     }
 }

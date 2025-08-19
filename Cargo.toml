@@ -24,6 +24,7 @@ exclude = ["./github"]
 codecov = { repository = "petabi/petal-clustering", service = "github" }
 
 [dependencies]
+itertools = "0.14.0"
 ndarray = "0.16"
 num-traits = "0.2"
 petal-neighbors = "0.13.0"
