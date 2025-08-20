@@ -123,7 +123,7 @@ pub fn condense_mst<A: FloatCore + Div>(
     // Start with every node having the root label
     let mut label = vec![n; max_parent + 1];
 
-    // Keep the minimum density level of cluster formations
+    // Keep the minimum density level of cluster formations w.r.t. the minimum cluster size
     let mut lambda = vec![A::max_value(); max_parent + 1];
 
     // Top down pass to relabel the nodes w.r.t. the minimum cluster size
@@ -138,11 +138,11 @@ pub fn condense_mst<A: FloatCore + Div>(
             .collect::<Vec<_>>();
 
         // Update the lambda value for the parent cluster
-        let num_points = edges
+        let parent_size = edges
             .iter()
             .map(|(_, child_size)| *child_size)
             .sum::<usize>();
-        if num_points >= min_cluster_size {
+        if parent_size >= min_cluster_size {
             lambda[parent] = if eps > A::zero() {
                 A::one() / eps
             } else {
@@ -150,53 +150,32 @@ pub fn condense_mst<A: FloatCore + Div>(
             };
         }
 
-        let mut new_clusters = edges
-            .iter()
-            .filter_map(|(child, child_size)| {
-                if *child_size >= min_cluster_size {
-                    Some(*child)
-                } else {
-                    None
-                }
-            })
-            .collect::<Vec<_>>();
+        // Partition the children into new clusters and non-clusters
+        let (mut new_clusters, mut non_clusters): (Vec<_>, Vec<_>) = edges
+            .into_iter()
+            .partition(|&(_, child_size)| child_size >= min_cluster_size);
 
-        let mut non_clusters = edges
-            .iter()
-            .filter_map(|(child, child_size)| {
-                if *child_size < min_cluster_size {
-                    Some(*child)
-                } else {
-                    None
-                }
-            })
-            .collect::<Vec<_>>();
-
-        // If the parent is not splitting into 2 or more clusters (shrinking),
-        // we can just add the new clusters to the non-cluster nodes.
+        // If the parent is not splitting into 2 or more new clusters,
+        // then parent is shrinking, so no need to create a new label
         if new_clusters.len() <= 1 {
             non_clusters.extend_from_slice(&new_clusters);
             new_clusters.clear();
         }
 
         // Assigning new labels to the child clusters
-        for child in new_clusters {
+        for (child, child_size) in new_clusters {
             label[child] = next_label;
+            result.push((label[parent], next_label, lambda[parent], child_size));
             next_label += 1;
         }
 
-        // Assign the parent's label to the children that are not clusters
-        for child in non_clusters {
+        // Propogate the parent's label and lambda to the non-cluster children:
+        for (child, child_size) in non_clusters {
             label[child] = label[parent];
-            lambda[child] = lambda[parent]; // For non-cluster children, propogate parent's lambda
-        }
-
-        // Add the edges to the result with the new labels:
-        for (child, child_size) in edges {
+            lambda[child] = lambda[parent];
             if child_size == 1 {
+                // The child is a single point, add it to the result
                 result.push((label[parent], child, lambda[parent], child_size));
-            } else if label[child] != label[parent] {
-                result.push((label[parent], label[child], lambda[parent], child_size));
             }
         }
     }
@@ -606,7 +585,7 @@ mod test {
         ];
         let min_cluster_size = 3;
 
-        // Condense the MST based on the minimum cluster size = 3:
+        // Condensing the hierarchy based on the minimum cluster size = 3 should yield:
         //             7
         //           /   \
         //         9       8

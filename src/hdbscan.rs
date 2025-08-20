@@ -167,7 +167,7 @@ fn label<A: FloatCore>(mst: &[(usize, usize, A)]) -> Vec<(usize, usize, A, usize
         let edges = edges.collect::<Vec<_>>();
 
         // Collect unique subtree roots (children)
-        let children = edges
+        let subtree_roots = edges
             .iter()
             .flat_map(|(u, v, _)| [uf.find(*u), uf.find(*v)])
             .unique()
@@ -180,7 +180,7 @@ fn label<A: FloatCore>(mst: &[(usize, usize, A)]) -> Vec<(usize, usize, A, usize
 
         // Assign parent-child labels
         let mut level: HashMap<usize, usize> = HashMap::new();
-        for child in children {
+        for child in subtree_roots {
             let parent = uf.find(child);
             let parent_label = level.entry(parent).or_insert_with(|| {
                 next_label += 1;
@@ -586,7 +586,7 @@ mod test {
 
         // Outlier2 joins the root cluster at:
         //      eps_outlier2 = √13
-        // The lowest eps that the root or any of its child clusters survive w.r.t. min_cluster_size = 4 is:
+        // The lowest eps that the root or any of its child clusters survive w.r.t. min_cluster_size = 5 is:
         //      eps_root = √2
         // Then the outlier score of outlier2 is:
         //      glosh(outlier2) =  1 - √2 / √13 = 0.61
