@@ -61,7 +61,6 @@ impl<A> Default for HDbscan<A, Euclidean>
 where
     A: FloatCore,
 {
-    #[must_use]
     fn default() -> Self {
         Self {
             alpha: A::one(),
