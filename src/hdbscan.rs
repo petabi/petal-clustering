@@ -60,7 +60,6 @@ impl<A> Default for HDbscan<A, Euclidean>
 where
     A: FloatCore,
 {
-    #[must_use]
     fn default() -> Self {
         Self {
             alpha: A::one(),
@@ -539,8 +538,8 @@ mod test {
         // The first 14 data objects immediately form their clusters at eps = √2
         // The outlier scores of these objects are all 0:
         //      glosh(x) = 1 - √2 / √2 = 0
-        for i in 0..14 {
-            assert_eq!(outlier_scores[i], 0.0);
+        for score in outlier_scores.iter().take(14) {
+            assert_eq!(*score, 0.0);
         }
 
         // Outlier1 joins the cluster C = {cluster1 ∪ cluster2} at:
