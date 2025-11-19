@@ -1,4 +1,6 @@
-use criterion::{black_box, Criterion};
+use std::hint::black_box;
+
+use criterion::Criterion;
 use ndarray::{arr2, ArrayView};
 use ndarray_rand::rand::{rngs::StdRng, Rng, SeedableRng};
 use petal_clustering::{Fit, Optics};
