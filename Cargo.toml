@@ -42,3 +42,6 @@ ndarray-rand = "0.15.0"
 [[bench]]
 name = "main"
 harness = false
+
+[lints.clippy]
+pedantic = "warn"
