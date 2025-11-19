@@ -5,6 +5,19 @@ file is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and
 this project adheres to [Semantic
 Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- Fixed merge inconsistency in `HDbscan` where the labeling process did not
+  consider ties (edges with equal weights). This could result in inconsistent
+  cluster merges while building the hierarchy, with some points being connected
+  to child clusters instead of their true parent clusters. The fix breaks ties
+  using subtree sizes, ensuring clusters are merged first before points are
+  merged. This particularly improves consistency with high dimensionality and
+  higher values of `min_samples` where equally weighted distances are common.
+  (PR #94 from @azizkayumov)
+
 ## [0.12.0] - 2025-05-03
 
 ### Added
@@ -170,6 +183,7 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 - The [OPTICS](https://en.wikipedia.org/wiki/OPTICS_algorithm) clustering
   algorithm.
 
+[Unreleased]: https://github.com/petabi/petal-clustering/compare/0.12.0...main
 [0.12.0]: https://github.com/petabi/petal-clustering/compare/0.11.0...0.12.0
 [0.11.0]: https://github.com/petabi/petal-clustering/compare/0.10.0...0.11.0
 [0.10.0]: https://github.com/petabi/petal-clustering/compare/0.9.0...0.10.0
