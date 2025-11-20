@@ -1,7 +1,7 @@
 use ndarray::{concatenate, Array2, ArrayView, ArrayView1, Axis};
 use ndarray_rand::rand::{
-    rngs::{OsRng, StdRng},
-    RngCore, SeedableRng,
+    rngs::StdRng,
+    rng, RngCore, SeedableRng,
 };
 use ndarray_rand::rand_distr::{Distribution, Normal, Uniform};
 
@@ -38,7 +38,9 @@ pub(crate) fn make_blobs(
                 let seed_rng = StdRng::from_seed(*seed);
                 uniform_centers(n_centers, n_features, center_box, seed_rng)
             } else {
-                uniform_centers(n_centers, n_features, center_box, OsRng)
+                let mut thread_rng = rng();
+                let seed_rng = StdRng::from_rng(&mut thread_rng);
+                uniform_centers(n_centers, n_features, center_box, seed_rng)
             }
         }
     };
@@ -46,18 +48,20 @@ pub(crate) fn make_blobs(
     let samples_per_center = n_samples / centers.nrows();
     let mut data = vec![];
     if let Some(seed) = random_state {
-        let seed_rng = StdRng::from_seed(seed);
+        let mut seed_rng = StdRng::from_seed(seed);
         for center in centers.rows() {
             data.push(make_a_blob(
                 center,
                 samples_per_center,
                 cluster_std,
-                &seed_rng,
+                &mut seed_rng,
             ));
         }
     } else {
+        let mut thread_rng = rng();
+        let mut seed_rng = StdRng::from_rng(&mut thread_rng);
         for center in centers.rows() {
-            data.push(make_a_blob(center, samples_per_center, cluster_std, &OsRng));
+            data.push(make_a_blob(center, samples_per_center, cluster_std, &mut seed_rng));
         }
     }
     let blobs: Vec<_> = data
@@ -75,15 +79,15 @@ pub(crate) fn make_blobs(
 ///  centered at `center` with standard deviation `std_dev`
 ///  blob size: `n_smaples`
 /// data is returned in form of Vec<f64> (COLUMN major: `n_features` * `n_samples`)
-fn make_a_blob<R: RngCore + Clone>(
+fn make_a_blob<R: RngCore>(
     center: ArrayView1<f64>,
     n_samples: usize,
     std_dev: f64,
-    seed_rng: &R,
+    seed_rng: &mut R,
 ) -> Vec<f64> {
     let mut data = Vec::new();
     for c in center {
-        let mut rng = StdRng::from_rng(seed_rng.clone()).unwrap();
+        let mut rng = StdRng::from_rng(&mut *seed_rng);
         let norm = Normal::new(*c, std_dev).unwrap();
         data.extend(norm.sample_iter(&mut rng).take(n_samples));
     }
@@ -97,11 +101,11 @@ fn uniform_centers<R: RngCore>(
     n_centers: usize,
     n_features: usize,
     center_box: (f64, f64),
-    seed_rng: R,
+    mut seed_rng: R,
 ) -> Array2<f64> {
     let (low, high) = center_box;
-    let mut rng = StdRng::from_rng(seed_rng).unwrap();
-    let between = Uniform::new(low, high);
+    let mut rng = StdRng::from_rng(&mut seed_rng);
+    let between = Uniform::new(low, high).unwrap();
     let data = between
         .sample_iter(&mut rng)
         .take(n_centers * n_features)
@@ -113,21 +117,25 @@ mod test {
 
     #[test]
     fn make_a_blob() {
-        use ndarray_rand::rand::rngs::OsRng;
+        use ndarray_rand::rand::{rngs::StdRng, rng, SeedableRng};
 
         let center = ndarray::arr1(&[1., 1., 1.]);
         let n = 5;
-        let blob = super::make_a_blob(center.view(), 5, 1., &OsRng);
+        let mut thread_rng = rng();
+        let mut rng = StdRng::from_rng(&mut thread_rng);
+        let blob = super::make_a_blob(center.view(), 5, 1., &mut rng);
         assert_eq!(blob.len(), center.ncols() * n);
     }
 
     #[test]
     fn uniform_centers() {
-        use ndarray_rand::rand::rngs::OsRng;
+        use ndarray_rand::rand::{rngs::StdRng, rng, SeedableRng};
 
         let n = 5;
         let m = 3;
-        let centers = super::uniform_centers(n, m, (-10., 10.), OsRng);
+        let mut thread_rng = rng();
+        let rng = StdRng::from_rng(&mut thread_rng);
+        let centers = super::uniform_centers(n, m, (-10., 10.), rng);
         assert_eq!(centers.nrows(), n);
         assert_eq!(centers.ncols(), m);
     }

@@ -7,6 +7,10 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- Updated ndarray to 0.17 and petal-neighbors to 0.18.
+
 ### Fixed
 
 - Fixed merge inconsistency in `HDbscan` where the labeling process did not

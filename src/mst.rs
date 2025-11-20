@@ -11,6 +11,7 @@ use rayon::prelude::*;
 
 use crate::union_find::TreeUnionFind;
 
+#[allow(clippy::needless_pass_by_value)] // Silences clippy warning. TODO: Update the parameter type to [`ArrayRef`](https://docs.rs/ndarray/latest/ndarray/struct.ArrayRef.html).
 pub fn mst_linkage<A: FloatCore>(
     input: ArrayView2<A>,
     metric: &dyn Metric<A>,

@@ -12,7 +12,7 @@ pub fn build(c: &mut Criterion) {
     let dim = black_box(3);
 
     let mut rng = StdRng::from_seed(*b"ball tree build bench test seed ");
-    let data: Vec<f64> = (0..n * dim).map(|_| rng.gen()).collect();
+    let data: Vec<f64> = (0..n * dim).map(|_| rng.random()).collect();
     let array = ArrayView::from_shape((n, dim), &data).unwrap();
     c.bench_function("hdbscan::build", |b| {
         b.iter(|| {
