@@ -1,8 +1,5 @@
 use ndarray::{concatenate, Array2, ArrayView, ArrayView1, Axis};
-use ndarray_rand::rand::{
-    rngs::StdRng,
-    rng, RngCore, SeedableRng,
-};
+use ndarray_rand::rand::{rng, rngs::StdRng, RngCore, SeedableRng};
 use ndarray_rand::rand_distr::{Distribution, Normal, Uniform};
 
 const DEFAULT_CLUSTER_STD: f64 = 1.0;
@@ -61,7 +58,12 @@ pub(crate) fn make_blobs(
         let mut thread_rng = rng();
         let mut seed_rng = StdRng::from_rng(&mut thread_rng);
         for center in centers.rows() {
-            data.push(make_a_blob(center, samples_per_center, cluster_std, &mut seed_rng));
+            data.push(make_a_blob(
+                center,
+                samples_per_center,
+                cluster_std,
+                &mut seed_rng,
+            ));
         }
     }
     let blobs: Vec<_> = data
@@ -117,7 +119,7 @@ mod test {
 
     #[test]
     fn make_a_blob() {
-        use ndarray_rand::rand::{rngs::StdRng, rng, SeedableRng};
+        use ndarray_rand::rand::{rng, rngs::StdRng, SeedableRng};
 
         let center = ndarray::arr1(&[1., 1., 1.]);
         let n = 5;
@@ -129,7 +131,7 @@ mod test {
 
     #[test]
     fn uniform_centers() {
-        use ndarray_rand::rand::{rngs::StdRng, rng, SeedableRng};
+        use ndarray_rand::rand::{rng, rngs::StdRng, SeedableRng};
 
         let n = 5;
         let m = 3;
