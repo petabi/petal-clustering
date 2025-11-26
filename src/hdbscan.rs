@@ -467,13 +467,7 @@ fn max_lambdas<A: FloatCore>(
 
 mod test {
     /// Verifies that Boruvka and Prim's algorithms compute consistent MSTs.
-    ///
-    /// This test is currently ignored because it demonstrates a known bug where
-    /// Boruvka produces a slightly different MST weight than Prim's algorithm.
-    ///
-    /// Run with: `cargo test boruvka_prim_mst_consistency --release -- --ignored`
     #[test]
-    #[ignore = "known bug: Boruvka MST weight differs from Prim (issue #69)"]
     fn boruvka_prim_mst_consistency() {
         use ndarray::Array2;
         use petal_neighbors::distance::Euclidean;
@@ -481,10 +475,10 @@ mod test {
 
         use crate::mst::{mst_linkage, Boruvka};
 
-        // Generate a larger dataset with multiple dimensions to exercise the
-        // Ball-tree lower bound pruning logic more thoroughly.
-        // The bug reported in #69 manifested with ~5000 points and 12 dimensions.
-        let n_points = 4898;
+        // Generate a dataset to trigger the bug in issue #69. The bug requires
+        // specific tree structure conditions where all points in a leaf node
+        // get skipped.
+        let n_points = 4530;
         let n_dims = 12;
         let min_samples = 15;
 
