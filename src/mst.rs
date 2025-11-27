@@ -302,6 +302,7 @@ where
             (None, None, _) => {
                 let mut lower = A::max_value();
                 let mut upper = A::zero();
+                let mut processed_any = false;
                 for &i in self.db.points_of(query) {
                     let c1 = self.components.point[i];
                     // mreach(i, j) >= core_i > candidate[c1]
@@ -309,6 +310,7 @@ where
                     if self.core_distances[i] > self.candidates.distances[c1] {
                         continue;
                     }
+                    processed_any = true;
                     for &j in self.db.points_of(reference) {
                         let c2 = self.components.point[j];
                         // mreach(i, j) >= core_j > candidate[c1] => prune
@@ -340,22 +342,28 @@ where
                     }
                 }
 
-                let radius = self.db.radius_of(query);
-                let mut bound = lower + radius + radius;
-                if bound > upper {
-                    bound = upper;
-                }
-                if bound < self.bounds[query] {
-                    self.bounds[query] = bound;
-                    let mut cur = query;
-                    while cur > 0 {
-                        let p = (cur - 1) / 2;
-                        let new_bound = self.bound(p);
-                        if new_bound >= self.bounds[p] {
-                            break;
+                // Only update bounds if we processed at least one point.
+                // If all points were skipped, lower=max_value and upper=0,
+                // which would incorrectly set the bound to 0 and cause
+                // over-pruning in future traversals. (See issue #69)
+                if processed_any {
+                    let radius = self.db.radius_of(query);
+                    let mut bound = lower + radius + radius;
+                    if bound > upper {
+                        bound = upper;
+                    }
+                    if bound < self.bounds[query] {
+                        self.bounds[query] = bound;
+                        let mut cur = query;
+                        while cur > 0 {
+                            let p = (cur - 1) / 2;
+                            let new_bound = self.bound(p);
+                            if new_bound >= self.bounds[p] {
+                                break;
+                            }
+                            self.bounds[p] = new_bound;
+                            cur = p;
                         }
-                        self.bounds[p] = new_bound;
-                        cur = p;
                     }
                 }
             }
