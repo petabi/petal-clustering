@@ -13,9 +13,9 @@ jobs:
       uses: dtolnay/rust-toolchain@stable
     - uses: actions/checkout@v6
     - name: Build
-      run: cargo build --verbose
+      run: cargo build --release --verbose
     - name: Run tests
-      run: cargo test --verbose
+      run: cargo test --release --verbose
   msrv:
     runs-on: ubuntu-latest
     steps:
