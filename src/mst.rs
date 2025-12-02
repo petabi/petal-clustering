@@ -655,4 +655,67 @@ mod test {
         ]);
         assert_eq!(answer, mst);
     }
+
+    /// Verifies that Boruvka and Prim's algorithms compute consistent MSTs.
+    #[test]
+    fn boruvka_prim_mst_consistency() {
+        use ndarray::Array2;
+        use petal_neighbors::distance::Euclidean;
+        use petal_neighbors::BallTree;
+
+        // Generate a dataset to trigger the bug in issue #69. The bug requires
+        // specific tree structure conditions where all points in a leaf node
+        // get skipped.
+        let n_points = 4530;
+        let n_dims = 12;
+        let min_samples = 15;
+
+        // Generate deterministic pseudo-random data using a simple LCG
+        let mut seed: u64 = 42;
+        let mut data_vec = Vec::with_capacity(n_points * n_dims);
+        for _ in 0..(n_points * n_dims) {
+            seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1);
+            let val = (seed >> 33) as f64 / (1u64 << 31) as f64 * 20.0 - 10.0;
+            data_vec.push(val);
+        }
+
+        let data: Array2<f64> =
+            Array2::from_shape_vec((n_points, n_dims), data_vec).expect("valid shape");
+
+        let metric = Euclidean::default();
+
+        // Compute MST using Boruvka
+        let db_boruvka = BallTree::new(data.view(), metric.clone()).expect("non-empty array");
+        let boruvka = super::Boruvka::new(db_boruvka, min_samples);
+        let mst_boruvka = boruvka.min_spanning_tree();
+        let weight_boruvka: f64 = mst_boruvka.iter().map(|(_, _, w)| *w).sum();
+
+        // Compute MST using Prim (mst_linkage)
+        let db_prim = BallTree::new(data.view(), metric.clone()).expect("non-empty array");
+        let core_distances = ndarray::Array1::from_vec(
+            data.rows()
+                .into_iter()
+                .map(|r| {
+                    db_prim
+                        .query(&r, min_samples)
+                        .1
+                        .last()
+                        .copied()
+                        .expect("at least one point")
+                })
+                .collect(),
+        );
+        let mst_prim = super::mst_linkage(data.view(), &metric, core_distances.view(), 1.0);
+        let weight_prim: f64 = mst_prim.iter().map(|(_, _, w)| *w).sum();
+
+        // Both algorithms should produce MSTs with the same total weight.
+        // The MST is unique when all edge weights are distinct, but even with
+        // ties, the total weight should be identical.
+        assert!(
+            (weight_boruvka - weight_prim).abs() < 1e-10,
+            "MST weights differ: Boruvka={}, Prim={}",
+            weight_boruvka,
+            weight_prim
+        );
+    }
 }
