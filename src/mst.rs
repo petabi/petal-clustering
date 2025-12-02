@@ -300,7 +300,6 @@ where
             self.db.compare_nodes(query, reference),
         ) {
             (None, None, _) => {
-                let mut lower = A::max_value();
                 let mut upper = A::zero();
                 let mut processed_any = false;
                 for &i in self.db.points_of(query) {
@@ -334,36 +333,25 @@ where
                             self.candidates.update(c1, (i, j, mreach));
                         }
                     }
-                    if self.candidates.distances[c1] < lower {
-                        lower = self.candidates.distances[c1];
-                    }
                     if self.candidates.distances[c1] > upper {
                         upper = self.candidates.distances[c1];
                     }
                 }
 
                 // Only update bounds if we processed at least one point.
-                // If all points were skipped, lower=max_value and upper=0,
-                // which would incorrectly set the bound to 0 and cause
-                // over-pruning in future traversals. (See issue #69)
-                if processed_any {
-                    let radius = self.db.radius_of(query);
-                    let mut bound = lower + radius + radius;
-                    if bound > upper {
-                        bound = upper;
-                    }
-                    if bound < self.bounds[query] {
-                        self.bounds[query] = bound;
-                        let mut cur = query;
-                        while cur > 0 {
-                            let p = (cur - 1) / 2;
-                            let new_bound = self.bound(p);
-                            if new_bound >= self.bounds[p] {
-                                break;
-                            }
-                            self.bounds[p] = new_bound;
-                            cur = p;
+                // Use only the upper bound (max candidate distance) for
+                // simplicity and performance.
+                if processed_any && upper < self.bounds[query] {
+                    self.bounds[query] = upper;
+                    let mut cur = query;
+                    while cur > 0 {
+                        let p = (cur - 1) / 2;
+                        let new_bound = self.bound(p);
+                        if new_bound >= self.bounds[p] {
+                            break;
                         }
+                        self.bounds[p] = new_bound;
+                        cur = p;
                     }
                 }
             }
@@ -399,34 +387,15 @@ where
     }
 
     #[inline]
-    fn lower_bound(&self, node: usize, parent: usize) -> A {
-        let diff = self.db.radius_of(parent) - self.db.radius_of(node);
-        self.bounds[node] + diff + diff
-    }
-
-    #[inline]
     fn bound(&self, parent: usize) -> A {
         let left = 2 * parent + 1;
         let right = left + 1;
 
-        let upper = if self.bounds[left] > self.bounds[right] {
+        // Use only upper bound (max of children)
+        if self.bounds[left] > self.bounds[right] {
             self.bounds[left]
         } else {
             self.bounds[right]
-        };
-
-        let lower_left = self.lower_bound(left, parent);
-        let lower_right = self.lower_bound(right, parent);
-        let lower = if lower_left > lower_right {
-            lower_right
-        } else {
-            lower_left
-        };
-
-        if lower > A::zero() && lower < upper {
-            lower
-        } else {
-            upper
         }
     }
 }
