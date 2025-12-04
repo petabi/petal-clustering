@@ -5,6 +5,14 @@ file is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and
 this project adheres to [Semantic
 Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- Fixed incorrect MST computation in the Boruvka algorithm when all points in a
+  leaf node are pruned. The bug caused over-pruning due to invalid bound updates
+  (setting bound to 0 when no points were processed). (PR #98, fixes #69)
+
 ## [0.13.0] - 2025-11-20
 
 ### Changed
@@ -187,6 +195,7 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 - The [OPTICS](https://en.wikipedia.org/wiki/OPTICS_algorithm) clustering
   algorithm.
 
+[Unreleased]: https://github.com/petabi/petal-clustering/compare/0.13.0...main
 [0.13.0]: https://github.com/petabi/petal-clustering/compare/0.12.0...0.13.0
 [0.12.0]: https://github.com/petabi/petal-clustering/compare/0.11.0...0.12.0
 [0.11.0]: https://github.com/petabi/petal-clustering/compare/0.10.0...0.11.0
