@@ -300,7 +300,6 @@ where
             self.db.compare_nodes(query, reference),
         ) {
             (None, None, _) => {
-                let mut lower = A::max_value();
                 let mut upper = A::zero();
                 for &i in self.db.points_of(query) {
                     let c1 = self.components.point[i];
@@ -332,21 +331,15 @@ where
                             self.candidates.update(c1, (i, j, mreach));
                         }
                     }
-                    if self.candidates.distances[c1] < lower {
-                        lower = self.candidates.distances[c1];
-                    }
                     if self.candidates.distances[c1] > upper {
                         upper = self.candidates.distances[c1];
                     }
                 }
 
-                let radius = self.db.radius_of(query);
-                let mut bound = lower + radius + radius;
-                if bound > upper {
-                    bound = upper;
-                }
-                if bound < self.bounds[query] {
-                    self.bounds[query] = bound;
+                // Use only the upper bound (max candidate distance) for
+                // simplicity and performance.
+                if upper < self.bounds[query] {
+                    self.bounds[query] = upper;
                     let mut cur = query;
                     while cur > 0 {
                         let p = (cur - 1) / 2;
@@ -391,34 +384,15 @@ where
     }
 
     #[inline]
-    fn lower_bound(&self, node: usize, parent: usize) -> A {
-        let diff = self.db.radius_of(parent) - self.db.radius_of(node);
-        self.bounds[node] + diff + diff
-    }
-
-    #[inline]
     fn bound(&self, parent: usize) -> A {
         let left = 2 * parent + 1;
         let right = left + 1;
 
-        let upper = if self.bounds[left] > self.bounds[right] {
+        // Use only upper bound (max of children)
+        if self.bounds[left] > self.bounds[right] {
             self.bounds[left]
         } else {
             self.bounds[right]
-        };
-
-        let lower_left = self.lower_bound(left, parent);
-        let lower_right = self.lower_bound(right, parent);
-        let lower = if lower_left > lower_right {
-            lower_right
-        } else {
-            lower_left
-        };
-
-        if lower > A::zero() && lower < upper {
-            lower
-        } else {
-            upper
         }
     }
 }
@@ -677,5 +651,68 @@ mod test {
             (1, 2, 8.0),
         ]);
         assert_eq!(answer, mst);
+    }
+
+    /// Verifies that Boruvka and Prim's algorithms compute consistent MSTs.
+    #[test]
+    fn boruvka_prim_mst_consistency() {
+        use ndarray::Array2;
+        use petal_neighbors::distance::Euclidean;
+        use petal_neighbors::BallTree;
+
+        // Generate a dataset to trigger the bug in issue #69. The bug requires
+        // specific tree structure conditions where all points in a leaf node
+        // get skipped.
+        let n_points = 4530;
+        let n_dims = 12;
+        let min_samples = 15;
+
+        // Generate deterministic pseudo-random data using a simple LCG
+        let mut seed: u64 = 42;
+        let mut data_vec = Vec::with_capacity(n_points * n_dims);
+        for _ in 0..(n_points * n_dims) {
+            seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1);
+            let val = (seed >> 33) as f64 / (1u64 << 31) as f64 * 20.0 - 10.0;
+            data_vec.push(val);
+        }
+
+        let data: Array2<f64> =
+            Array2::from_shape_vec((n_points, n_dims), data_vec).expect("valid shape");
+
+        let metric = Euclidean::default();
+
+        // Compute MST using Boruvka
+        let db_boruvka = BallTree::new(data.view(), metric.clone()).expect("non-empty array");
+        let boruvka = super::Boruvka::new(db_boruvka, min_samples);
+        let mst_boruvka = boruvka.min_spanning_tree();
+        let weight_boruvka: f64 = mst_boruvka.iter().map(|(_, _, w)| *w).sum();
+
+        // Compute MST using Prim (mst_linkage)
+        let db_prim = BallTree::new(data.view(), metric.clone()).expect("non-empty array");
+        let core_distances = ndarray::Array1::from_vec(
+            data.rows()
+                .into_iter()
+                .map(|r| {
+                    db_prim
+                        .query(&r, min_samples)
+                        .1
+                        .last()
+                        .copied()
+                        .expect("at least one point")
+                })
+                .collect(),
+        );
+        let mst_prim = super::mst_linkage(data.view(), &metric, core_distances.view(), 1.0);
+        let weight_prim: f64 = mst_prim.iter().map(|(_, _, w)| *w).sum();
+
+        // Both algorithms should produce MSTs with the same total weight.
+        // The MST is unique when all edge weights are distinct, but even with
+        // ties, the total weight should be identical.
+        assert!(
+            (weight_boruvka - weight_prim).abs() < 1e-10,
+            "MST weights differ: Boruvka={}, Prim={}",
+            weight_boruvka,
+            weight_prim
+        );
     }
 }
