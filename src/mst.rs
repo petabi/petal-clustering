@@ -301,7 +301,6 @@ where
         ) {
             (None, None, _) => {
                 let mut upper = A::zero();
-                let mut processed_any = false;
                 for &i in self.db.points_of(query) {
                     let c1 = self.components.point[i];
                     // mreach(i, j) >= core_i > candidate[c1]
@@ -309,7 +308,6 @@ where
                     if self.core_distances[i] > self.candidates.distances[c1] {
                         continue;
                     }
-                    processed_any = true;
                     for &j in self.db.points_of(reference) {
                         let c2 = self.components.point[j];
                         // mreach(i, j) >= core_j > candidate[c1] => prune
@@ -338,10 +336,9 @@ where
                     }
                 }
 
-                // Only update bounds if we processed at least one point.
                 // Use only the upper bound (max candidate distance) for
                 // simplicity and performance.
-                if processed_any && upper < self.bounds[query] {
+                if upper < self.bounds[query] {
                     self.bounds[query] = upper;
                     let mut cur = query;
                     while cur > 0 {
