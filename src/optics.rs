@@ -79,17 +79,14 @@ where
     }
 
     #[must_use]
-    pub fn extract_clusters_and_outliers(
-        &self,
-        eps: A,
-    ) -> (HashMap<usize, Vec<usize>>, Vec<usize>) {
-        let mut outliers = vec![];
+    pub fn extract_clusters_and_noise(&self, eps: A) -> (HashMap<usize, Vec<usize>>, Vec<usize>) {
+        let mut noise = vec![];
         let mut clusters: HashMap<usize, Vec<usize>> = HashMap::new();
 
         for &id in &self.ordered {
             if self.reachability[id].is_normal() && self.reachability[id] <= eps {
                 if clusters.is_empty() {
-                    outliers.push(id);
+                    noise.push(id);
                 } else {
                     let Some(v) = clusters.get_mut(&(clusters.len() - 1)) else {
                         unreachable!("`clusters` is not empty and its key is a sequence number");
@@ -101,11 +98,11 @@ where
                 if n.neighbors.len() >= self.min_samples && n.core_distance <= eps {
                     clusters.entry(clusters.len()).or_insert_with(|| vec![id]);
                 } else {
-                    outliers.push(id);
+                    noise.push(id);
                 }
             }
         }
-        (clusters, outliers)
+        (clusters, noise)
     }
 }
 
@@ -161,7 +158,7 @@ where
                 &mut visited,
             );
         }
-        self.extract_clusters_and_outliers(self.eps)
+        self.extract_clusters_and_noise(self.eps)
     }
 }
 
@@ -339,23 +336,23 @@ mod test {
         ];
 
         let mut model = Optics::new(0.5, 2, Euclidean::default());
-        let (mut clusters, mut outliers) = model.fit(&data, None);
-        outliers.sort_unstable();
+        let (mut clusters, mut noise) = model.fit(&data, None);
+        noise.sort_unstable();
         for (_, v) in clusters.iter_mut() {
             v.sort_unstable();
         }
 
         assert_eq!(hashmap! {0 => vec![0, 1, 2, 3], 1 => vec![4, 5]}, clusters);
-        assert_eq!(Vec::<usize>::new(), outliers);
+        assert_eq!(Vec::<usize>::new(), noise);
     }
 
     #[test]
     fn core_samples() {
         let data = array![[0.], [2.], [3.], [4.], [6.], [8.], [10.]];
         let mut model = Optics::new(1.01, 1, Euclidean::default());
-        let (clusters, outliers) = model.fit(&data, None);
+        let (clusters, noise) = model.fit(&data, None);
         assert_eq!(clusters.len(), 5); // {0: [0], 1: [1, 2, 3], 2: [4], 3: [5], 4: [6]}
-        assert!(outliers.is_empty());
+        assert!(noise.is_empty());
     }
 
     #[test]
@@ -364,8 +361,8 @@ mod test {
         let input = aview2(&data);
 
         let mut model = Optics::new(0.5, 2, Euclidean::default());
-        let (clusters, outliers) = model.fit(&input, None);
+        let (clusters, noise) = model.fit(&input, None);
         assert!(clusters.is_empty());
-        assert!(outliers.is_empty());
+        assert!(noise.is_empty());
     }
 }
