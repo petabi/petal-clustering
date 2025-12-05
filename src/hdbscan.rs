@@ -38,11 +38,11 @@ use crate::union_find::TreeUnionFind;
 ///    metric: Euclidean::default(),
 ///    boruvka: false,
 /// };
-/// let (clusters, outliers, _outlier_scores) = hdbscan.fit(&points, None);
+/// let (clusters, noise, _outlier_scores) = hdbscan.fit(&points, None);
 /// assert_eq!(clusters.len(), 2);   // two clusters found
 ///
 /// assert_eq!(
-///     outliers.len(),
+///     noise.len(),
 ///     points.nrows() - clusters.values().fold(0, |acc, v| acc + v.len()));
 /// ```
 #[derive(Debug, Deserialize, Serialize)]
@@ -146,9 +146,8 @@ where
         let labeled = label(&mst);
         let condensed = condense_mst(&labeled, self.min_cluster_size);
         let outlier_scores = glosh(&condensed, self.min_cluster_size);
-        let (clusters, outliers) =
-            find_clusters(&Array1::from_vec(condensed).view(), partial_labels);
-        (clusters, outliers, outlier_scores)
+        let (clusters, noise) = find_clusters(&Array1::from_vec(condensed).view(), partial_labels);
+        (clusters, noise, outlier_scores)
     }
 }
 
@@ -373,16 +372,16 @@ fn find_clusters<A: FloatCore + FromPrimitive + AddAssign + Sub>(
         .0;
 
     let mut res_clusters: HashMap<_, Vec<_>> = HashMap::new();
-    let mut outliers = vec![];
+    let mut noise = vec![];
     for (point, cluster) in clusters.iter().enumerate().take(num_events) {
         if let Some(cluster) = cluster {
             let c = res_clusters.entry(*cluster).or_default();
             c.push(point);
         } else {
-            outliers.push(point);
+            noise.push(point);
         }
     }
-    (res_clusters, outliers)
+    (res_clusters, noise)
 }
 
 // GLOSH: Global-Local Outlier Score from Hierarchies
@@ -488,10 +487,10 @@ mod test {
             metric: Euclidean::default(),
             boruvka: false,
         };
-        let (clusters, outliers, _) = hdbscan.fit(&data, None);
+        let (clusters, noise, _) = hdbscan.fit(&data, None);
         assert_eq!(clusters.len(), 2);
         assert_eq!(
-            outliers.len(),
+            noise.len(),
             data.nrows() - clusters.values().fold(0, |acc, v| acc + v.len())
         );
     }
@@ -518,10 +517,10 @@ mod test {
             metric: Euclidean::default(),
             boruvka: false,
         };
-        let (clusters, outliers, _) = hdbscan.fit(&data, None);
+        let (clusters, noise, _) = hdbscan.fit(&data, None);
         assert_eq!(clusters.len(), 2);
         assert_eq!(
-            outliers.len(),
+            noise.len(),
             data.nrows() - clusters.values().fold(0, |acc, v| acc + v.len())
         );
     }

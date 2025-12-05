@@ -118,11 +118,11 @@ where
         }
 
         let in_cluster: HashSet<usize> = clusters.values().flatten().copied().collect();
-        let outliers = (0..input.nrows())
+        let noise = (0..input.nrows())
             .filter(|x| !in_cluster.contains(x))
             .collect();
 
-        (clusters, outliers)
+        (clusters, noise)
     }
 }
 
@@ -188,23 +188,23 @@ mod test {
         ];
 
         let mut model = Dbscan::new(0.5, 2, Euclidean::default());
-        let (mut clusters, mut outliers) = model.fit(&data, None);
-        outliers.sort_unstable();
+        let (mut clusters, mut noise) = model.fit(&data, None);
+        noise.sort_unstable();
         for (_, v) in clusters.iter_mut() {
             v.sort_unstable();
         }
 
         assert_eq!(hashmap! {0 => vec![0, 1, 2, 3], 1 => vec![4, 5]}, clusters);
-        assert_eq!(Vec::<usize>::new(), outliers);
+        assert_eq!(Vec::<usize>::new(), noise);
     }
 
     #[test]
     fn dbscan_core_samples() {
         let data = array![[0.], [2.], [3.], [4.], [6.], [8.], [10.]];
         let mut model = Dbscan::new(1.01, 1, Euclidean::default());
-        let (clusters, outliers) = model.fit(&data, None);
+        let (clusters, noise) = model.fit(&data, None);
         assert_eq!(clusters.len(), 5); // {0: [0], 1: [1, 2, 3], 2: [4], 3: [5], 4: [6]}
-        assert!(outliers.is_empty());
+        assert!(noise.is_empty());
     }
 
     #[test]
@@ -213,9 +213,9 @@ mod test {
         let input = aview2(&data);
 
         let mut model = Dbscan::new(0.5, 2, Euclidean::default());
-        let (clusters, outliers) = model.fit(&input, None);
+        let (clusters, noise) = model.fit(&input, None);
         assert!(clusters.is_empty());
-        assert!(outliers.is_empty());
+        assert!(noise.is_empty());
     }
 
     #[test]
@@ -226,21 +226,21 @@ mod test {
         ];
         let input = data.reversed_axes();
         let mut model = Dbscan::new(0.5, 2, Euclidean::default());
-        let (mut clusters, mut outliers) = model.fit(&input, None);
-        outliers.sort_unstable();
+        let (mut clusters, mut noise) = model.fit(&input, None);
+        noise.sort_unstable();
         for (_, v) in clusters.iter_mut() {
             v.sort_unstable();
         }
 
         let input = input.as_standard_layout();
         model = Dbscan::new(0.5, 2, Euclidean::default());
-        let (mut std_clusters, mut std_outliers) = model.fit(&input, None);
-        std_outliers.sort_unstable();
+        let (mut std_clusters, mut std_noise) = model.fit(&input, None);
+        std_noise.sort_unstable();
         for (_, v) in std_clusters.iter_mut() {
             v.sort_unstable();
         }
 
         assert_eq!(std_clusters, clusters);
-        assert_eq!(std_outliers, outliers);
+        assert_eq!(std_noise, noise);
     }
 }
