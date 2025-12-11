@@ -172,7 +172,7 @@ mod test {
     #[test]
     fn default() {
         let dbscan = Dbscan::<f32, Euclidean>::default();
-        assert_eq!(dbscan.eps, 0.5);
+        assert!((dbscan.eps - 0.5).abs() < f32::EPSILON);
         assert_eq!(dbscan.min_samples, 5);
     }
 
@@ -190,7 +190,7 @@ mod test {
         let mut model = Dbscan::new(0.5, 2, Euclidean::default());
         let (mut clusters, mut noise) = model.fit(&data, None);
         noise.sort_unstable();
-        for (_, v) in clusters.iter_mut() {
+        for v in clusters.values_mut() {
             v.sort_unstable();
         }
 
@@ -228,7 +228,7 @@ mod test {
         let mut model = Dbscan::new(0.5, 2, Euclidean::default());
         let (mut clusters, mut noise) = model.fit(&input, None);
         noise.sort_unstable();
-        for (_, v) in clusters.iter_mut() {
+        for v in clusters.values_mut() {
             v.sort_unstable();
         }
 
@@ -236,7 +236,7 @@ mod test {
         model = Dbscan::new(0.5, 2, Euclidean::default());
         let (mut std_clusters, mut std_noise) = model.fit(&input, None);
         std_noise.sort_unstable();
-        for (_, v) in std_clusters.iter_mut() {
+        for v in std_clusters.values_mut() {
             v.sort_unstable();
         }
 

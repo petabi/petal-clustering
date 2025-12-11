@@ -671,7 +671,8 @@ mod test {
         let mut seed: u64 = 42;
         let mut data_vec = Vec::with_capacity(n_points * n_dims);
         for _ in 0..(n_points * n_dims) {
-            seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1);
+            seed = seed.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1);
+            #[allow(clippy::cast_precision_loss)]
             let val = (seed >> 33) as f64 / (1u64 << 31) as f64 * 20.0 - 10.0;
             data_vec.push(val);
         }
@@ -710,9 +711,7 @@ mod test {
         // ties, the total weight should be identical.
         assert!(
             (weight_boruvka - weight_prim).abs() < 1e-10,
-            "MST weights differ: Boruvka={}, Prim={}",
-            weight_boruvka,
-            weight_prim
+            "MST weights differ: Boruvka={weight_boruvka}, Prim={weight_prim}"
         );
     }
 }

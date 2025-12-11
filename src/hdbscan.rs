@@ -577,9 +577,7 @@ mod test {
         let actual = outlier_scores[18];
         assert!(
             (actual - expected).abs() < f64::EPSILON,
-            "Expected: {}, got: {}",
-            expected,
-            actual
+            "Expected: {expected}, got: {actual}"
         );
 
         // Outlier2 joins the root cluster at:
@@ -592,9 +590,7 @@ mod test {
         let actual = outlier_scores[19];
         assert!(
             (actual - expected).abs() < f64::EPSILON,
-            "Expected: {}, got: {}",
-            expected,
-            actual
+            "Expected: {expected}, got: {actual}"
         );
     }
 
@@ -752,7 +748,7 @@ mod test {
         partial_labels.insert(2, vec![7]);
         let bcubed_map: HashMap<usize, f64> = super::get_bcubed(&condensed.view(), &partial_labels);
         assert_eq!(bcubed_map.len(), 3);
-        assert_eq!(bcubed_map[&8], 0.0);
+        assert!(bcubed_map[&8].abs() < f64::EPSILON);
         assert!((bcubed_map[&9] - 8. / 25.).abs() < f64::EPSILON);
         assert!((bcubed_map[&10] - 4. / 15.).abs() < f64::EPSILON);
     }

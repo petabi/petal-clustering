@@ -320,7 +320,7 @@ mod test {
     #[test]
     fn default() {
         let optics = Optics::<f32, Euclidean>::default();
-        assert_eq!(optics.eps, 0.5);
+        assert!((optics.eps - 0.5).abs() < f32::EPSILON);
         assert_eq!(optics.min_samples, 5);
     }
 
@@ -338,7 +338,7 @@ mod test {
         let mut model = Optics::new(0.5, 2, Euclidean::default());
         let (mut clusters, mut noise) = model.fit(&data, None);
         noise.sort_unstable();
-        for (_, v) in clusters.iter_mut() {
+        for v in clusters.values_mut() {
             v.sort_unstable();
         }
 
