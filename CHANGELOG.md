@@ -13,6 +13,11 @@ Versioning](https://semver.org/spec/v2.0.0.html).
   leaf node are pruned. The bug caused over-pruning due to invalid bound updates
   (setting bound to 0 when no points were processed). (PR #98, fixes #69)
 
+### Changed
+
+- Renamed `outliers` to `noise` in the return values and internal variables of DBSCAN,
+  HDBSCAN, and OPTICS algorithms to improve semantic accuracy. (PR #99)
+
 ## [0.13.0] - 2025-11-20
 
 ### Changed
