@@ -13,10 +13,11 @@ The following example shows how to cluster points using DBSCAN.
 
 ```rust
 use ndarray::array;
+use petal_neighbors::distance::Euclidean;
 use petal_clustering::{Dbscan, Fit};
 
 let points = array![[1., 2.], [2., 2.], [2., 2.3], [8., 7.], [8., 8.], [25., 80.]];
-let clustering = Dbscan::new(3.0, 2).fit(&points);
+let clustering = Dbscan::new(3., 2, Euclidean::default()).fit(&points, None);
 
 assert_eq!(clustering.0.len(), 2);        // two clusters found
 assert_eq!(clustering.0[&0], [0, 1, 2]);  // the first three points in Cluster 0

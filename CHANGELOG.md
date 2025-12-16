@@ -24,10 +24,10 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 - Fixed merge inconsistency in `HDbscan` where the labeling process did not
   consider ties (edges with equal weights). This could result in inconsistent
   cluster merges while building the hierarchy, with some points being connected
-  to child clusters instead of their true parent clusters. The fix breaks ties
-  using subtree sizes, ensuring clusters are merged first before points are
-  merged. This particularly improves consistency with high dimensionality and
-  higher values of `min_samples` where equally weighted distances are common.
+  to child clusters instead of their true parent clusters. The fix involves
+  merging ties at the same time, ensuring they are correctly labeled with true 
+  parent cluster ids. This particularly improves consistency with high dimensionality 
+  and higher values of `min_samples` where equally weighted distances are common.
   (PR #94 from @azizkayumov)
 
 ## [0.12.0] - 2025-05-03
