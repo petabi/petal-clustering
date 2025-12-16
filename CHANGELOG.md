@@ -25,8 +25,8 @@ Versioning](https://semver.org/spec/v2.0.0.html).
   consider ties (edges with equal weights). This could result in inconsistent
   cluster merges while building the hierarchy, with some points being connected
   to child clusters instead of their true parent clusters. The fix involves
-  merging ties at the same time, ensuring they are correctly labeled with true 
-  parent cluster ids. This particularly improves consistency with high dimensionality 
+  merging ties at the same time, ensuring they are correctly labeled with true
+  parent cluster ids. This particularly improves consistency with high dimensionality
   and higher values of `min_samples` where equally weighted distances are common.
   (PR #94 from @azizkayumov)
 
