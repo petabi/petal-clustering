@@ -5,7 +5,7 @@ mod optics;
 mod union_find;
 
 pub use dbscan::Dbscan;
-pub use hdbscan::HDbscan;
+pub use hdbscan::{ClusterExtraction, HDbscan};
 pub use optics::Optics;
 
 /// An interface to train a model.
@@ -21,6 +21,10 @@ where
     I: ?Sized,
 {
     fn fit(&mut self, input: &I, params: Option<&P>) -> O;
+
+    fn fit_with_labels(&mut self, input: &I, partial_labels: &P) -> O {
+        self.fit(input, Some(partial_labels))
+    }
 }
 
 /// An interface to apply a trained model.
