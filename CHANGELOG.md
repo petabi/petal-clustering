@@ -7,16 +7,23 @@ Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- Updated `petal-neighbors` for SIMD-accelerated Euclidean and cosine distances
+  on contiguous `f32` and `f64` vectors with at least 32 dimensions. Built-in
+  metrics no longer support custom floating-point types; provide a custom
+  `Metric` implementation for those types.
+- Requires Rust 1.90 or later.
+- OPTICS now uses standard-layout input throughout fitting, including
+  reachability distance calculations.
+- Renamed `outliers` to `noise` in the return values and internal variables of
+  DBSCAN, HDBSCAN, and OPTICS algorithms to improve semantic accuracy. (PR #99)
+
 ### Fixed
 
 - Fixed incorrect MST computation in the Boruvka algorithm when all points in a
   leaf node are pruned. The bug caused over-pruning due to invalid bound updates
   (setting bound to 0 when no points were processed). (PR #98, fixes #69)
-
-### Changed
-
-- Renamed `outliers` to `noise` in the return values and internal variables of DBSCAN,
-  HDBSCAN, and OPTICS algorithms to improve semantic accuracy. (PR #99)
 
 ## [0.13.0] - 2025-11-20
 

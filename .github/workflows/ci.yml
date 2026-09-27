@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Install Rust
-      uses: dtolnay/rust-toolchain@1.81.0
+      uses: dtolnay/rust-toolchain@1.90.0
     - uses: actions/checkout@v6
     - name: Check compilation
       run: cargo build --verbose

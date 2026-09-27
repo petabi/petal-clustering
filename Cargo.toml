@@ -2,7 +2,7 @@
 name = "petal-clustering"
 version = "0.13.0"
 edition = "2021"
-rust-version = "1.81"
+rust-version = "1.90"
 description = "A collection of clustering algorithms."
 readme = "README.md"
 documentation = "https://docs.rs/petal-clustering"
@@ -27,7 +27,7 @@ codecov = { repository = "petabi/petal-clustering", service = "github" }
 itertools = "0.15.0"
 ndarray = "0.17"
 num-traits = "0.2"
-petal-neighbors = "0.18.0"
+petal-neighbors = { git = "https://github.com/petabi/petal-neighbors", rev = "182efa9" }
 rayon = "1"
 serde = { version = "1", features = ["derive"] }
 succinct = "0.5"
@@ -41,6 +41,10 @@ ndarray-rand = "0.16"
 
 [[bench]]
 name = "main"
+harness = false
+
+[[bench]]
+name = "clustering"
 harness = false
 
 [lints.clippy]

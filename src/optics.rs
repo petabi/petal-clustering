@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::ops::{AddAssign, DivAssign};
 
-use ndarray::{Array, ArrayBase, Data, Ix2};
+use ndarray::{ArrayBase, Data, Ix2};
 use num_traits::{float::FloatCore, FromPrimitive};
 use petal_neighbors::{
     distance::{Euclidean, Metric},
@@ -133,13 +133,8 @@ where
             return (HashMap::new(), vec![]);
         }
 
-        self.neighborhoods = if input.is_standard_layout() {
-            build_neighborhoods(input, self.eps, self.metric.clone())
-        } else {
-            let input = Array::from_shape_vec(input.raw_dim(), input.iter().copied().collect())
-                .expect("valid shape");
-            build_neighborhoods(&input, self.eps, self.metric.clone())
-        };
+        let input = input.as_standard_layout();
+        self.neighborhoods = build_neighborhoods(&input, self.eps, self.metric.clone());
         let mut visited = vec![false; input.nrows()];
         self.ordered = Vec::with_capacity(input.nrows());
         self.reachability = vec![A::nan(); input.nrows()];
@@ -149,7 +144,7 @@ where
             }
             process(
                 idx,
-                input,
+                &input,
                 self.min_samples,
                 &self.metric,
                 &self.neighborhoods,
@@ -313,7 +308,7 @@ where
 #[cfg(test)]
 mod test {
     use maplit::hashmap;
-    use ndarray::{array, aview2};
+    use ndarray::{array, aview2, Array2};
 
     use super::*;
 
@@ -364,5 +359,19 @@ mod test {
         let (clusters, noise) = model.fit(&input, None);
         assert!(clusters.is_empty());
         assert!(noise.is_empty());
+    }
+
+    #[test]
+    fn strided_high_dimensional_input_matches_contiguous_input() {
+        let contiguous = Array2::from_shape_fn((6, 64), |(row, col)| {
+            (row / 3) as f64 * 3.0 + (col % 7) as f64 / 100.0 + (row % 3) as f64 / 1000.0
+        });
+        let strided =
+            Array2::from_shape_fn((64, 6), |(col, row)| contiguous[[row, col]]).reversed_axes();
+        assert!(!strided.is_standard_layout());
+
+        let mut first = Optics::new(0.1, 2, Euclidean::default());
+        let mut second = Optics::new(0.1, 2, Euclidean::default());
+        assert_eq!(first.fit(&contiguous, None), second.fit(&strided, None));
     }
 }
