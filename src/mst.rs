@@ -110,14 +110,14 @@ pub fn condense_mst<A: FloatCore + Div>(
         .iter()
         .map(|(parent, _, _, _)| *parent)
         .min()
-        .map_or(0, |min_parent| min_parent);
+        .unwrap_or(0);
 
     // max_parent gives the number of clusters in the hierarchy
     let max_parent = mst
         .iter()
         .map(|(parent, _, _, _)| *parent)
         .max()
-        .map_or(0, |max_parent| max_parent);
+        .unwrap_or(0);
 
     let mut result: Vec<(usize, usize, A, usize)> = Vec::new();
 

@@ -363,8 +363,11 @@ mod test {
 
     #[test]
     fn strided_high_dimensional_input_matches_contiguous_input() {
+        let column_offsets = [0.0, 0.01, 0.02, 0.03, 0.04, 0.05, 0.06];
+        let row_offsets = [0.0, 0.001, 0.002];
         let contiguous = Array2::from_shape_fn((6, 64), |(row, col)| {
-            (row / 3) as f64 * 3.0 + (col % 7) as f64 / 100.0 + (row % 3) as f64 / 1000.0
+            let group = if row < 3 { 0.0 } else { 3.0 };
+            group + column_offsets[col % 7] + row_offsets[row % 3]
         });
         let strided =
             Array2::from_shape_fn((64, 6), |(col, row)| contiguous[[row, col]]).reversed_axes();

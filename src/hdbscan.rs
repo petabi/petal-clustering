@@ -238,7 +238,7 @@ fn get_bcubed<A: FloatCore + FromPrimitive + AddAssign + Sub>(
         .iter()
         .map(|(parent, _, _, _)| *parent)
         .min()
-        .map_or(0, |min_parent| min_parent);
+        .unwrap_or(0);
 
     // initialize the labels with the partial labels (if any)
     let mut labels: Vec<Option<usize>> = vec![None; num_events];
@@ -419,7 +419,7 @@ fn glosh<A: FloatCore>(
         .iter()
         .map(|(parent, _, _, _)| *parent)
         .min()
-        .map_or(0, |min_parent| min_parent);
+        .unwrap_or(0);
 
     let mut scores = vec![A::zero(); num_events];
     for (parent, child, lambda, _) in condensed_mst {
