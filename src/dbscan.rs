@@ -204,7 +204,7 @@ mod test {
         let mut model = Dbscan::new(1.01, 1, Euclidean::default());
         let (clusters, noise) = model.fit(&data, None);
         assert_eq!(clusters.len(), 5); // {0: [0], 1: [1, 2, 3], 2: [4], 3: [5], 4: [6]}
-        assert!(noise.is_empty());
+        assert_eq!(noise, [] as [usize; 0]);
     }
 
     #[test]
@@ -215,7 +215,7 @@ mod test {
         let mut model = Dbscan::new(0.5, 2, Euclidean::default());
         let (clusters, noise) = model.fit(&input, None);
         assert!(clusters.is_empty());
-        assert!(noise.is_empty());
+        assert_eq!(noise, [] as [usize; 0]);
     }
 
     #[test]
